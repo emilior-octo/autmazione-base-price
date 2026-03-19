@@ -2,7 +2,7 @@
 
 client_id = "4e9473fbc73e0163cd1d3187ab9c141f"
 name = "autmazione-base-price"
-application_url = "https://example.com"
+application_url = "https://autmazione-base-price.onrender.com"
 embedded = true
 
 [build]
@@ -31,4 +31,4 @@ api_version = "2026-04"
 scopes = "read_products,write_products"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://autmazione-base-price.onrender.com/api/auth" ]
