@@ -76,7 +76,25 @@ export async function syncProductBasePrice({ admin, productId }: SyncArgs) {
       },
     });
   } catch (error: any) {
-    console.error("[base-price-sync] GRAPHQL THROW", JSON.stringify(error, null, 2));
+    console.error("[base-price-sync] GRAPHQL MESSAGE", error?.message);
+    console.error(
+      "[base-price-sync] GRAPHQL ERRORS",
+      JSON.stringify(error?.graphQLErrors, null, 2)
+    );
+    console.error(
+      "[base-price-sync] GRAPHQL RESPONSE",
+      JSON.stringify(
+        error?.response
+          ? {
+              status: error.response.status,
+              statusText: error.response.statusText,
+              url: error.response.url,
+            }
+          : null,
+        null,
+        2
+      )
+    );
     throw error;
   }
 
