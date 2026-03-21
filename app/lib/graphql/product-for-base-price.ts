@@ -3,13 +3,13 @@ export const PRODUCT_FOR_BASE_PRICE_QUERY = `#graphql
     product(id: $id) {
       id
       title
-      metafield(namespace: "pricing", key: "base_price") {
+      basePriceMetafield: metafield(namespace: "pricing", key: "base_price") {
         namespace
         key
         value
         type
       }
-      metafield(namespace: "pricing", key: "discount_percentage") {
+      discountPercentageMetafield: metafield(namespace: "pricing", key: "discount_percentage") {
         namespace
         key
         value
