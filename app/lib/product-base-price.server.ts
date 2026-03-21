@@ -1,34 +1,33 @@
 import { PRODUCT_FOR_BASE_PRICE_QUERY } from "./graphql/product-for-base-price";
 import { METAFIELDS_SET_MUTATION } from "./graphql/metafields-set";
-import { METAFIELDS_DELETE_MUTATION } from "./graphql/metafields-delete";
 
 type SyncArgs = {
   admin: any;
   productId: string;
 };
 
-function computeBasePriceDecision(input: {
+function computeValues(input: {
   price: string | number | null;
   compareAtPrice: string | number | null;
 }) {
   const price = Number(input.price ?? 0);
   const compareAtPrice = Number(input.compareAtPrice ?? 0);
 
-  if (!price || price <= 0) {
-    return { action: "DELETE" as const };
+  let basePrice = price;
+  let discountPercentage = 0;
+
+  if (compareAtPrice && compareAtPrice > 0) {
+    basePrice = compareAtPrice;
+
+    if (compareAtPrice > price && price > 0) {
+      discountPercentage = ((compareAtPrice - price) / compareAtPrice) * 100;
+    }
   }
 
-  if (!compareAtPrice || compareAtPrice <= 0 || compareAtPrice <= price) {
-    return { action: "SET" as const, value: price.toFixed(2) };
-  }
-
-  const discountPct = ((compareAtPrice - price) / compareAtPrice) * 100;
-
-  if (discountPct < 30) {
-    return { action: "SET" as const, value: compareAtPrice.toFixed(2) };
-  }
-
-  return { action: "SET" as const, value: "0.00" };
+  return {
+    basePrice: basePrice.toFixed(2),
+    discountPercentage: discountPercentage.toFixed(2),
+  };
 }
 
 export async function syncProductBasePrice({ admin, productId }: SyncArgs) {
@@ -48,64 +47,42 @@ export async function syncProductBasePrice({ admin, productId }: SyncArgs) {
     (a, b) => (a.position ?? 0) - (b.position ?? 0)
   )[0];
 
-  const decision = computeBasePriceDecision({
+  const { basePrice, discountPercentage } = computeValues({
     price: referenceVariant.price,
     compareAtPrice: referenceVariant.compareAtPrice,
   });
 
-  if (decision.action === "SET") {
-    const setResponse = await admin.graphql(METAFIELDS_SET_MUTATION, {
-      variables: {
-        metafields: [
-          {
-            ownerId: product.id,
-            namespace: "pricing",
-            key: "base_price",
-            type: "number_decimal",
-            value: decision.value,
-          },
-        ],
-      },
-    });
-
-    const setJson = await setResponse.json();
-    const errors = setJson?.data?.metafieldsSet?.userErrors || [];
-
-    if (errors.length) {
-      throw new Error(`metafieldsSet error: ${JSON.stringify(errors)}`);
-    }
-
-    console.log("[base-price-sync] SET", {
-      productId: product.id,
-      value: decision.value,
-    });
-
-    return;
-  }
-
-  const deleteResponse = await admin.graphql(METAFIELDS_DELETE_MUTATION, {
+  const setResponse = await admin.graphql(METAFIELDS_SET_MUTATION, {
     variables: {
       metafields: [
         {
           ownerId: product.id,
           namespace: "pricing",
           key: "base_price",
+          type: "number_decimal",
+          value: basePrice,
+        },
+        {
+          ownerId: product.id,
+          namespace: "pricing",
+          key: "discount_percentage",
+          type: "number_decimal",
+          value: discountPercentage,
         },
       ],
     },
   });
 
-  const deleteJson = await deleteResponse.json();
-  console.log("[base-price-sync] DELETE RAW", JSON.stringify(deleteJson, null, 2));
-
-  const errors = deleteJson?.data?.metafieldsDelete?.userErrors || [];
+  const setJson = await setResponse.json();
+  const errors = setJson?.data?.metafieldsSet?.userErrors || [];
 
   if (errors.length) {
-    throw new Error(`metafieldsDelete error: ${JSON.stringify(errors)}`);
+    throw new Error(`metafieldsSet error: ${JSON.stringify(errors)}`);
   }
 
-  console.log("[base-price-sync] DELETE", {
+  console.log("[base-price-sync] SET", {
     productId: product.id,
-    deletedMetafields: deleteJson?.data?.metafieldsDelete?.deletedMetafields,
+    basePrice,
+    discountPercentage,
   });
 }
