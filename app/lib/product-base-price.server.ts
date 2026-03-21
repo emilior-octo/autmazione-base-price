@@ -74,10 +74,16 @@ export async function syncProductBasePrice({ admin, productId }: SyncArgs) {
   });
 
   const setJson = await setResponse.json();
-  const errors = setJson?.data?.metafieldsSet?.userErrors || [];
+  console.log("[base-price-sync] SET RAW", JSON.stringify(setJson, null, 2));
 
+  const topLevelErrors = setJson?.errors || [];
+  if (topLevelErrors.length) {
+    throw new Error(`metafieldsSet top-level error: ${JSON.stringify(topLevelErrors)}`);
+  }
+
+  const errors = setJson?.data?.metafieldsSet?.userErrors || [];
   if (errors.length) {
-    throw new Error(`metafieldsSet error: ${JSON.stringify(errors)}`);
+    throw new Error(`metafieldsSet userErrors: ${JSON.stringify(errors)}`);
   }
 
   console.log("[base-price-sync] SET", {
