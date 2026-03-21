@@ -52,26 +52,33 @@ export async function syncProductBasePrice({ admin, productId }: SyncArgs) {
     compareAtPrice: referenceVariant.compareAtPrice,
   });
 
-  const setResponse = await admin.graphql(METAFIELDS_SET_MUTATION, {
-    variables: {
-      metafields: [
-        {
-          ownerId: product.id,
-          namespace: "pricing",
-          key: "base_price",
-          type: "number_decimal",
-          value: basePrice,
-        },
-        {
-          ownerId: product.id,
-          namespace: "pricing",
-          key: "discount_percentage",
-          type: "number_decimal",
-          value: discountPercentage,
-        },
-      ],
-    },
-  });
+  let setResponse;
+
+  try {
+    setResponse = await admin.graphql(METAFIELDS_SET_MUTATION, {
+      variables: {
+        metafields: [
+          {
+            ownerId: product.id,
+            namespace: "pricing",
+            key: "base_price",
+            type: "number_decimal",
+            value: basePrice,
+          },
+          {
+            ownerId: product.id,
+            namespace: "pricing",
+            key: "discount_percentage",
+            type: "number_decimal",
+            value: discountPercentage,
+          },
+        ],
+      },
+    });
+  } catch (error: any) {
+    console.error("[base-price-sync] GRAPHQL THROW", JSON.stringify(error, null, 2));
+    throw error;
+  }
 
   const setJson = await setResponse.json();
   console.log("[base-price-sync] SET RAW", JSON.stringify(setJson, null, 2));
