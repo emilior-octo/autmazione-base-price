@@ -7,8 +7,13 @@ type Variant = {
   compareAtPrice: string | null;
 };
 
-export async function syncProductBasePrice(admin: any, productId: string) {
-  try {
+export async function syncProductBasePrice({
+  admin,
+  productId,
+}: {
+  admin: any;
+  productId: string;
+}) {  try {
     const response = await admin.graphql(PRODUCT_FOR_BASE_PRICE_QUERY, {
       variables: { id: productId },
     });
