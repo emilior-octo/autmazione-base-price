@@ -1,141 +1,120 @@
 import { PRODUCT_FOR_BASE_PRICE_QUERY } from "./graphql/product-for-base-price";
 import { METAFIELDS_SET_MUTATION } from "./graphql/metafields-set";
 
-type SyncArgs = {
-  admin: any;
-  productId: string;
+type Variant = {
+  id: string;
+  price: string;
+  compareAtPrice: string | null;
 };
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+export async function syncProductBasePrice(admin: any, productId: string) {
+  try {
+    const response = await admin.graphql(PRODUCT_FOR_BASE_PRICE_QUERY, {
+      variables: { id: productId },
+    });
 
-function isThrottledError(error: any) {
-  const message = String(error?.message || "").toLowerCase();
-  return message.includes("throttled");
-}
+    const json = await response.json();
 
-async function graphqlWithRetry(
-  admin: any,
-  query: string,
-  variables: Record<string, any>,
-  attempts = 4,
-) {
-  let lastError: any;
+    const product = json?.data?.product;
 
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      return await admin.graphql(query, { variables });
-    } catch (error: any) {
-      lastError = error;
+    if (!product) return;
 
-      if (!isThrottledError(error) || attempt === attempts) {
-        throw error;
-      }
-
-      const waitMs = 800 * attempt;
-      console.warn("[base-price-sync] THROTTLED RETRY", {
-        attempt,
-        waitMs,
+    // 🚫 SOLO ACTIVE
+    if (product.status !== "ACTIVE") {
+      console.log("[base-price-sync] SKIP NOT ACTIVE", {
+        productId,
+        status: product.status,
       });
-
-      await sleep(waitMs);
+      return;
     }
-  }
 
-  throw lastError;
-}
+    const variants: Variant[] = product.variants?.nodes || [];
+    if (!variants.length) return;
 
-function computeValues(input: {
-  price: string | number | null;
-  compareAtPrice: string | number | null;
-}) {
-  const price = Number(input.price ?? 0);
-  const compareAtPrice = Number(input.compareAtPrice ?? 0);
+    // prendiamo prima variante (ok per il tuo use case)
+    const v = variants[0];
 
-  let basePrice = price;
-  let discountPercentage = 0;
+    const price = parseFloat(v.price || "0");
+    const compareAt = parseFloat(v.compareAtPrice || "0");
 
-  if (compareAtPrice && compareAtPrice > 0) {
-    basePrice = compareAtPrice;
+    let basePrice = 0;
+    let discountPercentage = 0;
 
-    if (compareAtPrice > price && price > 0) {
-      discountPercentage = ((compareAtPrice - price) / compareAtPrice) * 100;
+    if (compareAt > 0) {
+      basePrice = compareAt;
+
+      if (compareAt > price && price > 0) {
+        discountPercentage = ((compareAt - price) / compareAt) * 100;
+      }
+    } else {
+      basePrice = price;
     }
+
+    // normalizzazione
+    const basePriceStr = basePrice.toFixed(2);
+    const discountInt = Math.round(discountPercentage); // INTEGER!
+
+    const existingBase =
+      product.basePriceMetafield?.value
+        ? parseFloat(product.basePriceMetafield.value)
+        : null;
+
+    const existingDiscount =
+      product.discountPercentageMetafield?.value
+        ? parseInt(product.discountPercentageMetafield.value)
+        : null;
+
+    // 🧠 NO-OP WRITE (STOP LOOP)
+    const baseUnchanged =
+      existingBase !== null &&
+      Math.abs(existingBase - basePrice) < 0.01;
+
+    const discountUnchanged =
+      existingDiscount !== null &&
+      existingDiscount === discountInt;
+
+    if (baseUnchanged && discountUnchanged) {
+      console.log("[base-price-sync] SKIP NO CHANGE", {
+        productId,
+      });
+      return;
+    }
+
+    console.log("[base-price-sync] SET", {
+      productId,
+      basePrice: basePriceStr,
+      discountPercentage: discountInt,
+    });
+
+    const mutationRes = await admin.graphql(METAFIELDS_SET_MUTATION, {
+      variables: {
+        metafields: [
+          {
+            ownerId: productId,
+            namespace: "pricing",
+            key: "base_price",
+            type: "number_decimal",
+            value: basePriceStr,
+          },
+          {
+            ownerId: productId,
+            namespace: "pricing",
+            key: "discount_percentage",
+            type: "number_integer",
+            value: discountInt.toString(),
+          },
+        ],
+      },
+    });
+
+    const mutationJson = await mutationRes.json();
+
+    const userErrors = mutationJson?.data?.metafieldsSet?.userErrors;
+
+    if (userErrors?.length) {
+      console.error("metafieldsSet userErrors:", userErrors);
+    }
+  } catch (error: any) {
+    console.error("[base-price-sync] ERROR", error);
   }
-
-  return {
-    basePrice: basePrice.toFixed(2),
-    discountPercentage: discountPercentage.toFixed(2),
-  };
-}
-
-export async function syncProductBasePrice({ admin, productId }: SyncArgs) {
-  const response = await graphqlWithRetry(
-    admin,
-    PRODUCT_FOR_BASE_PRICE_QUERY,
-    { id: productId },
-    4,
-  );
-
-  const json = await response.json();
-  const product = json?.data?.product;
-
-  if (!product) return;
-
-  const variants = product?.variants?.nodes || [];
-  if (!variants.length) return;
-
-  const referenceVariant = [...variants].sort(
-    (a, b) => (a.position ?? 0) - (b.position ?? 0),
-  )[0];
-
-  const { basePrice, discountPercentage } = computeValues({
-    price: referenceVariant.price,
-    compareAtPrice: referenceVariant.compareAtPrice,
-  });
-
-  const setResponse = await graphqlWithRetry(
-    admin,
-    METAFIELDS_SET_MUTATION,
-    {
-      metafields: [
-        {
-          ownerId: product.id,
-          namespace: "pricing",
-          key: "base_price",
-          type: "number_decimal",
-          value: basePrice,
-        },
-        {
-          ownerId: product.id,
-          namespace: "pricing",
-          key: "discount_percentage",
-          type: "number_integer",
-          value: String(Math.round(Number(discountPercentage))),
-        },
-      ],
-    },
-    4,
-  );
-
-  const setJson = await setResponse.json();
-
-  const topLevelErrors = setJson?.errors || [];
-  if (topLevelErrors.length) {
-    throw new Error(
-      `metafieldsSet top-level error: ${JSON.stringify(topLevelErrors)}`,
-    );
-  }
-
-  const errors = setJson?.data?.metafieldsSet?.userErrors || [];
-  if (errors.length) {
-    throw new Error(`metafieldsSet userErrors: ${JSON.stringify(errors)}`);
-  }
-
-  console.log("[base-price-sync] SET", {
-    productId: product.id,
-    basePrice,
-    discountPercentage,
-  });
 }
