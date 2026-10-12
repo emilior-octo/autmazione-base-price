@@ -10,6 +10,15 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { syncProductBasePrice } from "../lib/product-base-price.server";
 
+type ManualRunProductsResult = {
+  data?: {
+    products?: {
+      edges?: Array<{ cursor: string; node: { id: string; title: string } }>;
+      pageInfo?: { hasNextPage: boolean };
+    };
+  };
+};
+
 const PRODUCTS_QUERY = `#graphql
   query ManualRunProducts($cursor: String) {
     products(first: 100, after: $cursor, sortKey: ID) {
@@ -40,15 +49,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   let processed = 0;
 
   while (hasNextPage) {
-    const response = await admin.graphql(PRODUCTS_QUERY, {
+    const response: Response = await admin.graphql(PRODUCTS_QUERY, {
       variables: { cursor },
     });
 
-    const json = await response.json();
-    const products = json?.data?.products?.edges || [];
+    const json: ManualRunProductsResult = await response.json();
+    const products: NonNullable<NonNullable<ManualRunProductsResult["data"]>["products"]>["edges"] = json?.data?.products?.edges || [];
     hasNextPage = json?.data?.products?.pageInfo?.hasNextPage || false;
 
-    for (const edge of products) {
+    for (const edge of products ?? []) {
       const productId = edge?.node?.id;
       if (!productId) continue;
 
@@ -61,7 +70,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       cursor = edge.cursor;
     }
 
-    if (!products.length) {
+    if (!products?.length) {
       hasNextPage = false;
     }
   }
