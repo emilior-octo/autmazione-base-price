@@ -22,7 +22,7 @@ export async function action({request}: ActionFunctionArgs) {
  try {
   // Exact approved Shoe Finder engine; install file using the documented copy command.
   const core = require(process.cwd() + "/app/lib/ai-advisor/shoe-finder-core.cjs").ValsportShoeFinderCore
-    ?? globalThis.ValsportShoeFinderCore;
+    ?? (globalThis as any).ValsportShoeFinderCore;
   if (!core?.rankProducts) throw new Error("Core unavailable");
   const catalog = await getAdvisorCatalog(input.gender);
   const answers = {
