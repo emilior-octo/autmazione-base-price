@@ -22,6 +22,16 @@ query AdvisorCatalog($id: ID!, $after: String) {
  }
 }`;
 
+function normalizeCollectionGid(raw: string): string {
+ const value = raw.trim();
+ if (/^gid:\/\/shopify\/Collection\/\d+$/.test(value)) return value;
+ if (/^\d+$/.test(value)) return `gid://shopify/Collection/${value}`;
+ const match = value.match(/^https?:\/\/[^/]+\/store\/[^/]+\/collections\/(\d+)(?:[/?#]|$)/i)
+  ?? value.match(/^https?:\/\/[^/]+\/admin\/collections\/(\d+)(?:[/?#]|$)/i);
+ if (match) return `gid://shopify/Collection/${match[1]}`;
+ throw new Error("Invalid Advisor collection ID configuration");
+}
+
 type Gender = "men" | "women";
 const cache = new Map<Gender, {expires: number; products: unknown[]}>();
 function field(v: {type?: string; value: string} | null) {
@@ -35,6 +45,7 @@ export async function getAdvisorCatalog(gender: Gender) {
  const shop = process.env.SHOPIFY_SHOP_DOMAIN;
  const collectionId = gender === "men" ? process.env.VALSPORT_MEN_COLLECTION_GID : process.env.VALSPORT_WOMEN_COLLECTION_GID;
  if (!shop || !collectionId) throw new Error("Missing Advisor Shopify configuration");
+ const collectionGid = normalizeCollectionGid(collectionId);
  let admin: Awaited<ReturnType<typeof unauthenticated.admin>>["admin"];
  try {
   ({admin} = await unauthenticated.admin(shop));
@@ -49,7 +60,7 @@ export async function getAdvisorCatalog(gender: Gender) {
  for (;;) {
   let response: Response;
   try {
-   response = await admin.graphql(QUERY, {variables: {id: collectionId, after}});
+   response = await admin.graphql(QUERY, {variables: {id: collectionGid, after}});
   } catch (error) {
    console.error("[AI_ADVISOR][GRAPHQL]", {name: error instanceof Error ? error.name : "Unknown", message: error instanceof Error ? error.message.slice(0,240) : "Unknown"});
    throw new Error("Advisor Shopify GraphQL request failed");
