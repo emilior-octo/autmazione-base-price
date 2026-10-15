@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { createRequire } from "node:module";
-import { authenticate } from "../shopify.server";
+import { authenticate, unauthenticated } from "../shopify.server";
 import { getAdvisorCatalog } from "../lib/ai-advisor/catalog.server";
 import { saveVerifiedRunnerProfile } from "../lib/ai-advisor/customer-profile.server";
 import { sendRunningRecommendationsToKlaviyo } from "../lib/ai-advisor/klaviyo.server";
@@ -64,15 +64,16 @@ export async function action({request}:ActionFunctionArgs) {
     await saveVerifiedRunnerProfile(customerId, input as any);
     profileSaved=true;
     try {
-     const response=await proxy.admin!.graphql(`#graphql
+     const {admin}=await unauthenticated.admin(shop);
+     const response=await admin.graphql(`#graphql
        query AdvisorCustomer($id: ID!) {
         customer(id:$id) { id email emailMarketingConsent { marketingState } }
        }`,{variables:{id:"gid://shopify/Customer/"+customerId}});
      const customerData=await response.json() as any;
      const customer=customerData.data?.customer;
-     if(customer?.email && customer.emailMarketingConsent?.marketingState==="SUBSCRIBED") {
+     if(customer?.email) {
       await sendRunningRecommendationsToKlaviyo(
-       {id:customer.id,email:customer.email},input as any,products as any);
+       {id:customer.id,email:customer.email},answers as any,products as any);
      }
     } catch(error) {
      console.error("[AI_ADVISOR][KLAVIYO]",error instanceof Error?error.message:"Unknown");
