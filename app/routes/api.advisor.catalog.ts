@@ -12,7 +12,15 @@ export async function loader({request}: LoaderFunctionArgs) {
  try {
   const products = await getAdvisorCatalog(gender);
   return Response.json({products}, {headers:{"Cache-Control":"no-store"}});
- } catch {
+ } catch (error) {
+  const message = error instanceof Error ? error.message : "Unknown error";
+  const category = message.includes("Missing Advisor Shopify configuration") ? "CONFIG_MISSING"
+    : message.includes("Shopify catalog query failed") ? "GRAPHQL_QUERY_FAILED"
+    : message.includes("Incomplete product variants") ? "VARIANT_PAGINATION"
+    : message.includes("pagination failure") ? "COLLECTION_PAGINATION"
+    : /offline session|session.*not found|session.*missing|not installed/i.test(message) ? "SHOPIFY_SESSION"
+    : "SHOPIFY_CLIENT_OR_UNKNOWN";
+  console.error("[AI_ADVISOR][CATALOG]", {gender, category, errorName: error instanceof Error ? error.name : "Unknown"});
   return Response.json({error:"Catalog unavailable"}, {status:503});
  }
 }
