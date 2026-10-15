@@ -42,6 +42,7 @@ export async function getAdvisorCatalog(gender: Gender) {
   console.error("[AI_ADVISOR][SESSION]", {name: error instanceof Error ? error.name : "Unknown", message: error instanceof Error ? error.message.slice(0,240) : "Unknown"});
   throw new Error("Advisor Shopify offline session failed");
  }
+ console.info("[AI_ADVISOR][STAGE]", {gender, stage:"session_ready"});
  const products: unknown[] = [];
  let after: string | null = null;
  const cursors = new Set<string>();
@@ -53,6 +54,7 @@ export async function getAdvisorCatalog(gender: Gender) {
    console.error("[AI_ADVISOR][GRAPHQL]", {name: error instanceof Error ? error.name : "Unknown", message: error instanceof Error ? error.message.slice(0,240) : "Unknown"});
    throw new Error("Advisor Shopify GraphQL request failed");
   }
+  console.info("[AI_ADVISOR][STAGE]", {gender, stage:"graphql_response_received"});
   const json = await response.json() as any;
   if (json.errors?.length || !json.data?.collection) {
    console.error("[AI_ADVISOR][GRAPHQL_RESPONSE]", {
@@ -63,6 +65,7 @@ export async function getAdvisorCatalog(gender: Gender) {
    throw new Error("Shopify catalog query failed");
   }
   const page = json.data.collection.products;
+  console.info("[AI_ADVISOR][STAGE]", {gender, stage:"transform_start", count:page?.nodes?.length ?? null});
   for (const p of page.nodes) {
    if (p.variants.pageInfo.hasNextPage) throw new Error("Incomplete product variants: " + p.id);
    const first = p.variants.nodes.find((v: any) => v.availableForSale) ?? p.variants.nodes[0];
@@ -85,6 +88,7 @@ export async function getAdvisorCatalog(gender: Gender) {
   if (!after || cursors.has(after)) throw new Error("Shopify catalog pagination failure");
   cursors.add(after);
  }
+ console.info("[AI_ADVISOR][STAGE]", {gender, stage:"complete", count:products.length});
  cache.set(gender, {products, expires: Date.now() + 60000});
  return products;
 }
