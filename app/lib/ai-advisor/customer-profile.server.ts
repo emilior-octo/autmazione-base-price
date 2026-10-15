@@ -2,7 +2,7 @@ import { unauthenticated } from "../../shopify.server";
 
 type Runner = Record<"gender"|"size"|"weight"|"usage"|"support"|"distance", string>;
 export async function saveVerifiedRunnerProfile(customerId: string, profile: Runner) {
- if (!/^\\d+$/.test(customerId)) throw new Error("Invalid authenticated customer ID");
+ if (!/^[0-9]+$/.test(customerId)) throw new Error("Invalid authenticated customer ID");
  const shop = process.env.SHOPIFY_SHOP_DOMAIN;
  if (!shop) throw new Error("Missing shop configuration");
  const {admin} = await unauthenticated.admin(shop);
