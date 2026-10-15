@@ -35,14 +35,33 @@ export async function getAdvisorCatalog(gender: Gender) {
  const shop = process.env.SHOPIFY_SHOP_DOMAIN;
  const collectionId = gender === "men" ? process.env.VALSPORT_MEN_COLLECTION_GID : process.env.VALSPORT_WOMEN_COLLECTION_GID;
  if (!shop || !collectionId) throw new Error("Missing Advisor Shopify configuration");
- const {admin} = await unauthenticated.admin(shop);
+ let admin: Awaited<ReturnType<typeof unauthenticated.admin>>["admin"];
+ try {
+  ({admin} = await unauthenticated.admin(shop));
+ } catch (error) {
+  console.error("[AI_ADVISOR][SESSION]", {name: error instanceof Error ? error.name : "Unknown", message: error instanceof Error ? error.message.slice(0,240) : "Unknown"});
+  throw new Error("Advisor Shopify offline session failed");
+ }
  const products: unknown[] = [];
  let after: string | null = null;
  const cursors = new Set<string>();
  for (;;) {
-  const response = await admin.graphql(QUERY, {variables: {id: collectionId, after}});
+  let response: Response;
+  try {
+   response = await admin.graphql(QUERY, {variables: {id: collectionId, after}});
+  } catch (error) {
+   console.error("[AI_ADVISOR][GRAPHQL]", {name: error instanceof Error ? error.name : "Unknown", message: error instanceof Error ? error.message.slice(0,240) : "Unknown"});
+   throw new Error("Advisor Shopify GraphQL request failed");
+  }
   const json = await response.json() as any;
-  if (json.errors?.length || !json.data?.collection) throw new Error("Shopify catalog query failed");
+  if (json.errors?.length || !json.data?.collection) {
+   console.error("[AI_ADVISOR][GRAPHQL_RESPONSE]", {
+    errorCodes: (json.errors ?? []).map((e: any) => e.extensions?.code ?? "UNSPECIFIED"),
+    messages: (json.errors ?? []).map((e: any) => String(e.message ?? "").slice(0,160)),
+    collectionNull: json.data?.collection == null
+   });
+   throw new Error("Shopify catalog query failed");
+  }
   const page = json.data.collection.products;
   for (const p of page.nodes) {
    if (p.variants.pageInfo.hasNextPage) throw new Error("Incomplete product variants: " + p.id);
