@@ -52,6 +52,8 @@ export async function action({request}:ActionFunctionArgs) {
   return Response.json({
    status:ranked.all.length?"success":"no_matches",totalMatches:ranked.all.length,
    products:ranked.all.slice(0,4).map((p:any,i:number)=>({
+    productId:catalog.find((item:any)=>item.handle===p.handle)?.id ?? null,
+    imageUrl:catalog.find((item:any)=>item.handle===p.handle)?.image ?? null,
     rank:i+1,title:p.title,handle:p.handle,bucket:p.bucket,
     priceCents:p.price,technicalScore:p.score,reasons:p.labels,
     url:"/products/"+encodeURIComponent(p.handle)
