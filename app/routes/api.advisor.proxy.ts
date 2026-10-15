@@ -36,7 +36,7 @@ export async function action({request}:ActionFunctionArgs) {
   return Response.json({error:"Incomplete runner profile"},{status:400});
  if(Object.entries(allowedValues).some(([key,values])=>!values.includes(String(input[key]))))
   return Response.json({error:"Invalid profile value"},{status:400});
- if(!/^(?:[2-5][0-9])(?:\\.5)?$/.test(String(input.size)))
+ if(!/^(?:[2-5][0-9])(?:\.5)?$/.test(String(input.size)))
   return Response.json({error:"Invalid shoe size"},{status:400});
  try {
   const core=require(process.cwd()+"/app/lib/ai-advisor/shoe-finder-core.cjs").ValsportShoeFinderCore
