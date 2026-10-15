@@ -31,3 +31,8 @@ scopes = "read_products,write_products"
 
 [auth]
 redirect_urls = [ "https://autmazione-base-price.onrender.com/api/auth" ]
+
+[app_proxy]
+url = "https://autmazione-base-price.onrender.com/api/advisor/proxy"
+subpath = "running-advisor"
+prefix = "apps"
