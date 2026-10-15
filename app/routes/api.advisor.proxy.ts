@@ -2,6 +2,8 @@ import type { ActionFunctionArgs } from "react-router";
 import { createRequire } from "node:module";
 import { authenticate } from "../shopify.server";
 import { getAdvisorCatalog } from "../lib/ai-advisor/catalog.server";
+import { saveVerifiedRunnerProfile } from "../lib/ai-advisor/customer-profile.server";
+import { sendRunningRecommendationsToKlaviyo } from "../lib/ai-advisor/klaviyo.server";
 
 const require = createRequire(import.meta.url);
 const allowed = ["gender","size","weight","usage","support","distance"] as const;
@@ -49,15 +51,37 @@ export async function action({request}:ActionFunctionArgs) {
    support:core.normalizeSupport(input.support),distance:core.normalizeDistance(input.distance)
   };
   const ranked=core.rankProducts(catalog.map(core.normalizeProduct),answers);
-  return Response.json({
-   status:ranked.all.length?"success":"no_matches",totalMatches:ranked.all.length,
-   products:ranked.all.slice(0,4).map((p:any,i:number)=>({
+  const products=ranked.all.slice(0,4).map((p:any,i:number)=>({
     productId:catalog.find((item:any)=>item.handle===p.handle)?.id ?? null,
     imageUrl:catalog.find((item:any)=>item.handle===p.handle)?.image ?? null,
     rank:i+1,title:p.title,handle:p.handle,bucket:p.bucket,
     priceCents:p.price,technicalScore:p.score,reasons:p.labels,
     url:"/products/"+encodeURIComponent(p.handle)
-   }))
+   }));
+   const customerId=new URL(request.url).searchParams.get("logged_in_customer_id");
+   let profileSaved=false;
+   if(input.saveProfile===true && customerId) {
+    await saveVerifiedRunnerProfile(customerId, input as any);
+    profileSaved=true;
+    try {
+     const response=await proxy.admin!.graphql(`#graphql
+       query AdvisorCustomer($id: ID!) {
+        customer(id:$id) { id email emailMarketingConsent { marketingState } }
+       }`,{variables:{id:"gid://shopify/Customer/"+customerId}});
+     const customerData=await response.json() as any;
+     const customer=customerData.data?.customer;
+     if(customer?.email && customer.emailMarketingConsent?.marketingState==="SUBSCRIBED") {
+      await sendRunningRecommendationsToKlaviyo(
+       {id:customer.id,email:customer.email},input as any,products as any);
+     }
+    } catch(error) {
+     console.error("[AI_ADVISOR][KLAVIYO]",error instanceof Error?error.message:"Unknown");
+    }
+   }
+  return Response.json({
+   profileSaved,
+   status:ranked.all.length?"success":"no_matches",totalMatches:ranked.all.length,
+   products
   },{headers:{"Cache-Control":"no-store"}});
  } catch(error) {
   console.error("[AI_ADVISOR][PROXY]",error instanceof Error?error.message:"Unknown");
