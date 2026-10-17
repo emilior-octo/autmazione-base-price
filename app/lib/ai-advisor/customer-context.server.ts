@@ -8,7 +8,6 @@ export async function getAdvisorCustomerContext(verifiedCustomerId: string) {
   const response = await admin.graphql(`#graphql
     query AdvisorCustomerContext($id: ID!) {
       customer(id: $id) {
-        firstName
         metafield(namespace: "custom", key: "running_profile") { value }
         orders(first: 5, sortKey: CREATED_AT, reverse: true) {
           nodes {
@@ -20,7 +19,7 @@ export async function getAdvisorCustomerContext(verifiedCustomerId: string) {
     }
   `, { variables: { id: "gid://shopify/Customer/" + verifiedCustomerId } });
   const json = await response.json() as any;
-  if (json.errors?.length) throw new Error("Customer query failed or permissions missing");
+  if (json.errors?.length) { console.warn("[ADVISOR CUSTOMER] GraphQL errors", json.errors.map((e: any) => ({ code: e.extensions?.code || "UNKNOWN", path: e.path?.join(".") || "unknown" }))); throw new Error("Customer query failed or permissions missing"); }
   const customer = json.data?.customer;
   if (!customer) return null;
   let profile: Record<string, string> | null = null;
@@ -33,7 +32,6 @@ export async function getAdvisorCustomerContext(verifiedCustomerId: string) {
     }
   } catch {}
   return {
-    firstName: String(customer.firstName || "").slice(0, 50),
     runnerProfile: profile,
     recentOrders: (customer.orders?.nodes || []).map((order: any) => ({
       date: String(order.createdAt || "").slice(0, 10),
