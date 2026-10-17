@@ -18,7 +18,7 @@ export async function action({request}:ActionFunctionArgs) {
  const messages=Array.isArray(data?.messages)?data.messages.slice(-10):[];
  if(!messages.length||messages.some((m:any)=>!m||!["user","assistant"].includes(m.role)||typeof m.content!=="string"||m.content.length>1000))return Response.json({error:"Invalid messages"},{status:400});
  const c=data?.context||{},safe=(x:any)=>typeof x==="string"?x.slice(0,100):"";
- const context={page:safe(c.page),product:safe(c.product),recent:Array.isArray(c.recent)?c.recent.slice(-4).map(safe):[],cart:c.cart&&typeof c.cart==="object"?{itemCount:Number(c.cart.itemCount)||0,items:Array.isArray(c.cart.items)?c.cart.items.slice(0,6).map((i:any)=>({title:safe(i.title),variant:safe(i.variant),quantity:Math.max(0,Math.min(20,Number(i.quantity)||0))})):[]}:null};
+ const context={page:safe(c.page),product:safe(c.product),recent:Array.isArray(c.recent)?c.recent.slice(-4).map(safe):[],journey:Array.isArray(c.journey)?c.journey.slice(-12).map((e:any)=>({kind:safe(e?.kind),value:safe(e?.value)})):[],cart:c.cart&&typeof c.cart==="object"?{itemCount:Number(c.cart.itemCount)||0,items:Array.isArray(c.cart.items)?c.cart.items.slice(0,6).map((i:any)=>({title:safe(i.title),variant:safe(i.variant),quantity:Math.max(0,Math.min(20,Number(i.quantity)||0))})):[]}:null};
  try {
   const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),18000);
   let response:Response;
