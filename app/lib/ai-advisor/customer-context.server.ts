@@ -4,8 +4,11 @@ export async function getAdvisorCustomerContext(verifiedCustomerId: string) {
   if (!/^\d{1,20}$/.test(verifiedCustomerId)) return null;
   const shop = process.env.SHOPIFY_SHOP_DOMAIN;
   if (!shop) throw new Error("Shop not configured");
-  const { admin } = await unauthenticated.admin(shop);
-  const response = await admin.graphql(`#graphql
+  let admin;
+  try { ({ admin } = await unauthenticated.admin(shop)); }
+  catch (error) { console.warn("[ADVISOR CUSTOMER] Admin session failed", error instanceof Error ? error.message.slice(0,180) : "Unknown"); throw new Error("Admin session unavailable"); }
+  let response;
+  try { response = await admin.graphql(`#graphql
     query AdvisorCustomerContext($id: ID!) {
       customer(id: $id) {
         metafield(namespace: "custom", key: "running_profile") { value }
@@ -17,8 +20,11 @@ export async function getAdvisorCustomerContext(verifiedCustomerId: string) {
         }
       }
     }
-  `, { variables: { id: "gid://shopify/Customer/" + verifiedCustomerId } });
-  const json = await response.json() as any;
+  `, { variables: { id: "gid://shopify/Customer/" + verifiedCustomerId } }); }
+  catch (error) { console.warn("[ADVISOR CUSTOMER] GraphQL request failed", error instanceof Error ? error.message.slice(0,180) : "Unknown"); throw new Error("GraphQL request unavailable"); }
+  let json: any;
+  try { json = await response.json(); }
+  catch (error) { console.warn("[ADVISOR CUSTOMER] GraphQL response parse failed", error instanceof Error ? error.name : "Unknown"); throw new Error("GraphQL response invalid"); }
   if (json.errors?.length) { console.warn("[ADVISOR CUSTOMER] GraphQL errors", json.errors.map((e: any) => ({ code: e.extensions?.code || "UNKNOWN", path: e.path?.join(".") || "unknown" }))); throw new Error("Customer query failed or permissions missing"); }
   const customer = json.data?.customer;
   if (!customer) return null;
