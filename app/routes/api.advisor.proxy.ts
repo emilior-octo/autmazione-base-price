@@ -71,7 +71,7 @@ export async function action({request}:ActionFunctionArgs) {
        }`,{variables:{id:"gid://shopify/Customer/"+customerId}});
      const customerData=await response.json() as any;
      const customer=customerData.data?.customer;
-     if(customer?.email) {
+     if(customer?.email && customer.emailMarketingConsent?.marketingState === "SUBSCRIBED") {
       await sendRunningRecommendationsToKlaviyo(
        {id:customer.id,email:customer.email},answers as any,products as any);
      }
