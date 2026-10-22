@@ -33,7 +33,7 @@ export async function loader({request}:LoaderFunctionArgs) {
 export async function action({request}:ActionFunctionArgs) {
  if(request.method!=="POST")return Response.json({error:"Method not allowed"},{status:405,headers});
  let c;try{c=await context(request)}catch{return Response.json({status:"unavailable"},{status:503,headers})}
- if(!c)return Response.json({status:"login_required"},{status:401,headers});
+ if(!c)return Response.json({status:"login_required",code:"AUTH_REQUIRED"},{status:401,headers});
  let body:any;try{body=await request.json()}catch{return Response.json({error:"Invalid request"},{status:400,headers})}
  if(body?.choice!=="accept"&&body?.choice!=="decline")return Response.json({error:"Invalid choice"},{status:400,headers});
  try{
@@ -43,14 +43,20 @@ export async function action({request}:ActionFunctionArgs) {
       metafieldsSet(metafields:$fields){metafields{id}userErrors{message}}
     }`,{variables:{fields:[{ownerId:c.ownerId,namespace:"custom",key:"running_marketing_decision",type:"single_line_text_field",value:"declined"}]}});
     const result:any=await response.json();
-    if(result.errors?.length||result.data?.metafieldsSet?.userErrors?.length)throw new Error("Unable to store decision");
+    if(result.errors?.length||result.data?.metafieldsSet?.userErrors?.length||!result.data?.metafieldsSet?.metafields?.length){
+      console.error("[ADVISOR CONSENT] Decline GraphQL",JSON.stringify({errors:result.errors?.map((e:any)=>e.message),userErrors:result.data?.metafieldsSet?.userErrors}).slice(0,650));
+      throw new Error("DECLINE_WRITE_FAILED");
+    }
   }else{
     const response=await c.admin.graphql(`#graphql mutation AdvisorOptIn($input:CustomerEmailMarketingConsentUpdateInput!){
       customerEmailMarketingConsentUpdate(input:$input){customer{id}userErrors{message}}
     }`,{variables:{input:{customerId:c.ownerId,emailMarketingConsent:{marketingState:"SUBSCRIBED",marketingOptInLevel:"SINGLE_OPT_IN"}}}});
     const result:any=await response.json();
-    if(result.errors?.length||result.data?.customerEmailMarketingConsentUpdate?.userErrors?.length||!result.data?.customerEmailMarketingConsentUpdate?.customer)throw new Error("Unable to update email marketing consent");
+    if(result.errors?.length||result.data?.customerEmailMarketingConsentUpdate?.userErrors?.length||!result.data?.customerEmailMarketingConsentUpdate?.customer){
+      console.error("[ADVISOR CONSENT] Opt-in GraphQL",JSON.stringify({errors:result.errors?.map((e:any)=>e.message),userErrors:result.data?.customerEmailMarketingConsentUpdate?.userErrors}).slice(0,650));
+      throw new Error("OPT_IN_WRITE_FAILED");
+    }
   }
   return Response.json({status:"success"},{headers});
- }catch(e){console.error("[ADVISOR CONSENT]",e instanceof Error?e.name:"Unknown");return Response.json({status:"unavailable"},{status:503,headers})}
+ }catch(e){console.error("[ADVISOR CONSENT]",e instanceof Error?e.message:"Unknown");return Response.json({status:"unavailable",code:e instanceof Error?e.message:"WRITE_FAILED"},{status:503,headers})}
 }
