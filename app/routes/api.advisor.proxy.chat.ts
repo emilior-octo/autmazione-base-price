@@ -3,6 +3,7 @@ import { authenticate } from "../shopify.server";
 import { getAdvisorCatalog } from "../lib/ai-advisor/catalog.server";
 import { searchAdvisorCatalog } from "../lib/ai-advisor/catalog-search.server";
 import { getAdvisorCustomerContext } from "../lib/ai-advisor/customer-context.server";
+import { saveVerifiedRunnerProfile } from "../lib/ai-advisor/customer-profile.server";
 import { createRequire } from "node:module";
 const require=createRequire(import.meta.url);
 
@@ -48,6 +49,13 @@ export async function action({request}:ActionFunctionArgs) {
     const catalog=await getAdvisorCatalog(args.gender);
     const answers={gender:args.gender,size:core.normalizeSize(args.size),weight:core.normalizeWeight(args.weight),usage:core.normalizeUsage(args.usage),support:core.normalizeSupport(args.support),distance:core.normalizeDistance(args.distance)};
     const ranked=core.rankProducts(catalog.map(core.normalizeProduct),answers);
+    // Persist only a fully validated profile, tied to the identity signed by
+    // Shopify App Proxy. Never accept a customer ID from browser JSON.
+    const verifiedCustomerId=new URL(request.url).searchParams.get("logged_in_customer_id");
+    if(verifiedCustomerId && /^\d{1,20}$/.test(verifiedCustomerId)){
+      try { await saveVerifiedRunnerProfile(verifiedCustomerId, answers as any); }
+      catch(error){ console.warn("[ADVISOR CHAT] Profile could not be saved",error instanceof Error?error.name:"Unknown"); }
+    }
     products=ranked.all.slice(0,4).map((p:any)=>{const item:any=catalog.find((x:any)=>x.handle===p.handle);return {title:p.title,handle:p.handle,imageUrl:item?.image||"",priceCents:p.price,reasons:p.labels,url:"/products/"+encodeURIComponent(p.handle),size:args.size}});
     reply=products.length?"Ho trovato queste scarpe nel catalogo Valsport, selezionate dal nostro Shoe Finder in base al tuo profilo. Puoi scegliere la taglia e aggiungerle al carrello direttamente qui.":"Non ho trovato scarpe disponibili compatibili con il tuo profilo e la taglia indicata. Possiamo valutare un'altra taglia o modificare qualche preferenza.";
    }catch(err){console.error("[ADVISOR CHAT] Finder",err instanceof Error?err.message:"Unknown");reply="Non riesco a verificare le raccomandazioni tecniche in questo momento. Riprova tra poco."}
