@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
+import { authenticate, unauthenticated } from "../shopify.server";
+import { sendRunningRecommendationsToKlaviyo } from "../lib/ai-advisor/klaviyo.server";
 import { getAdvisorCatalog } from "../lib/ai-advisor/catalog.server";
 import { searchAdvisorCatalog } from "../lib/ai-advisor/catalog-search.server";
 import { getAdvisorCustomerContext } from "../lib/ai-advisor/customer-context.server";
@@ -53,8 +54,30 @@ export async function action({request}:ActionFunctionArgs) {
     // Shopify App Proxy. Never accept a customer ID from browser JSON.
     const verifiedCustomerId=new URL(request.url).searchParams.get("logged_in_customer_id");
     if(verifiedCustomerId && /^\d{1,20}$/.test(verifiedCustomerId)){
-      try { await saveVerifiedRunnerProfile(verifiedCustomerId, answers as any); }
-      catch(error){ console.warn("[ADVISOR CHAT] Profile could not be saved",error instanceof Error?error.name:"Unknown"); }
+      try {
+        await saveVerifiedRunnerProfile(verifiedCustomerId, answers as any);
+        // Marketing events are sent only after Shopify confirms email opt-in.
+        try {
+          const {admin}=await unauthenticated.admin(shop);
+          const response=await admin.graphql(`#graphql
+            query AdvisorMarketingConsent($id: ID!) {
+              customer(id:$id) { id email emailMarketingConsent { marketingState } }
+            }`,{variables:{id:"gid://shopify/Customer/"+verifiedCustomerId}});
+          const result:any=await response.json();
+          const customer=result.data?.customer;
+          if(customer?.email && customer.emailMarketingConsent?.marketingState==="SUBSCRIBED"){
+            const selections=ranked.all.slice(0,4).map((p:any,i:number)=>{
+              const item:any=catalog.find((x:any)=>x.handle===p.handle);
+              return {
+                productId:item?.id??null,handle:p.handle,title:p.title,
+                url:"/products/"+encodeURIComponent(p.handle),imageUrl:item?.image??null,
+                priceCents:p.price,rank:i+1,technicalScore:p.score,reasons:p.labels
+              };
+            });
+            await sendRunningRecommendationsToKlaviyo({id:customer.id,email:customer.email},answers as any,selections);
+          }
+        }catch(error){ console.warn("[ADVISOR CHAT] Klaviyo sync unavailable",error instanceof Error?error.name:"Unknown"); }
+      }catch(error){ console.warn("[ADVISOR CHAT] Profile could not be saved",error instanceof Error?error.name:"Unknown"); }
     }
     products=ranked.all.slice(0,4).map((p:any)=>{const item:any=catalog.find((x:any)=>x.handle===p.handle);return {title:p.title,handle:p.handle,imageUrl:item?.image||"",priceCents:p.price,reasons:p.labels,url:"/products/"+encodeURIComponent(p.handle),size:args.size}});
     reply=products.length?"Ho trovato queste scarpe nel catalogo Valsport, selezionate dal nostro Shoe Finder in base al tuo profilo. Puoi scegliere la taglia e aggiungerle al carrello direttamente qui.":"Non ho trovato scarpe disponibili compatibili con il tuo profilo e la taglia indicata. Possiamo valutare un'altra taglia o modificare qualche preferenza.";
