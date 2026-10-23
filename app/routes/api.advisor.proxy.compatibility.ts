@@ -102,12 +102,15 @@ export async function loader({request}:LoaderFunctionArgs) {
     const wanted=new Set(ids);
     const catalogIds=new Set(catalog.map((p:any)=>String(p.id||"").split("/").pop()));
     const scores:Record<string,{percentage:number;reasons:string[]}>={};
+    const unavailable:Record<string,string>={};
     let technicalCoverage=0;
     let currentlyAvailableSize=0;
     for(const item of normalized){
       const productId=String(item.id||"").split("/").pop()||"";
-      if(!wanted.has(productId)||item.excluded)continue;
-      if(!item.usage?.length||!item.distance_range?.length||!item.weight_range?.length||!item.support?.length)continue;
+      if(!wanted.has(productId))continue;
+      if(item.excluded){unavailable[productId]='excluded_by_finder';continue;}
+      const missing=['support','usage','weight_range','distance_range'].filter(key=>!item[key]?.length);
+      if(missing.length){unavailable[productId]='missing_'+missing.join('_');continue;}
       technicalCoverage++;
       const sizeMatch=core.getSizeCompatibility(item.sizes_available,answers.size);
       if(sizeMatch.isCompatible)currentlyAvailableSize++;
@@ -121,7 +124,8 @@ export async function loader({request}:LoaderFunctionArgs) {
       const labels=core.buildLabels({...item,size_match:{isExact:false,hasHalfTolerance:false}},answers);
       scores[productId]={percentage,reasons:Array.isArray(labels)?labels.filter((x:unknown)=>typeof x==="string").slice(0,2):[]};
     }
-    return Response.json({status:"success",scores,diagnostics:{requested:ids.length,foundInShopify:ids.filter(x=>catalogIds.has(x)).length,technicallyScored:Object.keys(scores).length,technicalCoverage,availableInCustomerSize:currentlyAvailableSize}},{headers});
+    for(const id of ids)if(!catalogIds.has(id))unavailable[id]='not_found_in_shopify';
+    return Response.json({status:"success",scores,unavailable,diagnostics:{requested:ids.length,foundInShopify:ids.filter(x=>catalogIds.has(x)).length,technicallyScored:Object.keys(scores).length,technicalCoverage,availableInCustomerSize:currentlyAvailableSize}},{headers});
   }catch(error){
     console.error("[ADVISOR COMPATIBILITY]",{stage,message:error instanceof Error?error.message:"Unknown"});
     // Shopify App Proxy can substitute a generic HTML 500 for upstream 5xx.
