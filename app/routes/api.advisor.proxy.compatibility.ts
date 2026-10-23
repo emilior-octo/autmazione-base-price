@@ -49,6 +49,7 @@ export async function loader({request}:LoaderFunctionArgs) {
     };
     const ranked=core.rankProducts(catalog.map(core.normalizeProduct),answers);
     const wanted=new Set(ids);
+    const catalogIds=new Set(catalog.map((p:any)=>String(p.id||"").split("/").pop()));
     const scores:Record<string,{percentage:number;reasons:string[]}>={};
     for(const item of ranked.all){
       const productId=String(item.id||"").split("/").pop()||"";
