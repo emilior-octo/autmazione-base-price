@@ -5,6 +5,7 @@ import { getAdvisorCustomerContext } from "../lib/ai-advisor/customer-context.se
 
 
 const require = createRequire(import.meta.url);
+const {scoreTechnicalCompatibility}=require("../lib/ai-advisor/technical-compatibility.cjs");
 const required = ["gender","size","weight","usage","support","distance"] as const;
 const allowed: Record<string,string[]> = {
   gender:["men","women"],usage:["daily","long-distance","speed","race","trail"],
@@ -114,15 +115,7 @@ export async function loader({request}:LoaderFunctionArgs) {
       technicalCoverage++;
       const sizeMatch=core.getSizeCompatibility(item.sizes_available,answers.size);
       if(sizeMatch.isCompatible)currentlyAvailableSize++;
-      const bucket=core.getSupportBucket(item,answers.support);
-      // Score uses the existing Finder technical dimensions (35+18+12).
-      // Avoid a misleading high percentage for unsupported foot mechanics.
-      const points=core.scoreWithinBucket({...item,size_match:{isExact:false,hasHalfTolerance:false}},answers);
-      const technical=(Number(points.usage)||0)+(Number(points.distance)||0)+(Number(points.weight)||0);
-      const raw=Math.max(0,Math.min(100,Math.round(technical/65*100)));
-      const percentage=bucket==="primary"?raw:bucket==="secondary"?Math.min(raw,70):Math.min(raw,40);
-      const labels=core.buildLabels({...item,size_match:{isExact:false,hasHalfTolerance:false}},answers);
-      scores[productId]={percentage,reasons:Array.isArray(labels)?labels.filter((x:unknown)=>typeof x==="string").slice(0,2):[]};
+      scores[productId]=scoreTechnicalCompatibility(core,item,answers);
     }
     for(const id of ids)if(!catalogIds.has(id))unavailable[id]='not_found_in_shopify';
     return Response.json({status:"success",scores,unavailable,diagnostics:{requested:ids.length,foundInShopify:ids.filter(x=>catalogIds.has(x)).length,technicallyScored:Object.keys(scores).length,technicalCoverage,availableInCustomerSize:currentlyAvailableSize}},{headers});
