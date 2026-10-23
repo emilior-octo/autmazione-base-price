@@ -6,6 +6,7 @@ import { getAdvisorCustomerContext } from "../lib/ai-advisor/customer-context.se
 
 const require = createRequire(import.meta.url);
 const {scoreTechnicalCompatibility}=require(process.cwd()+"/app/lib/ai-advisor/technical-compatibility.cjs");
+const {genderEligibility}=require(process.cwd()+"/app/lib/ai-advisor/product-gender.cjs");
 const required = ["gender","size","weight","usage","support","distance"] as const;
 const allowed: Record<string,string[]> = {
   gender:["men","women"],usage:["daily","long-distance","speed","race","trail"],
@@ -17,7 +18,7 @@ const headers={"Cache-Control":"private, no-store"};
 const productQuery=`#graphql
  query CompatibilityProducts($ids:[ID!]!){
   nodes(ids:$ids){... on Product {
-   id handle
+   id handle tags
    support:metafield(namespace:"custom",key:"finder_support"){type value}
    usage:metafield(namespace:"custom",key:"finder_usage"){type value}
    weight:metafield(namespace:"custom",key:"finder_weight_range"){type value}
@@ -47,7 +48,7 @@ async function getVisibleShoes(admin:any,ids:string[]){
     return String(size?.value||"").replace(",",".").replace(/\s*(?:EU|EUR)\b/gi,"").trim();
    }).filter(Boolean)||[];
    products.push({
-    id:String(product.id).split("/").pop(),handle:product.handle,
+    id:String(product.id).split("/").pop(),handle:product.handle,tags:product.tags,
     support:metafield(product.support),usage:metafield(product.usage),
     weight_range:metafield(product.weight),distance_range:metafield(product.distance),
     excluded:product.excluded?.value==="true",priority:0,price:0,
@@ -110,6 +111,8 @@ export async function loader({request}:LoaderFunctionArgs) {
       const productId=String(item.id||"").split("/").pop()||"";
       if(!wanted.has(productId))continue;
       if(item.excluded){unavailable[productId]='excluded_by_finder';continue;}
+      const department=genderEligibility(catalog.find(p=>String(p.id)===productId)?.tags,answers.gender);
+      if(!department.eligible){unavailable[productId]=department.reason;continue;}
       const missing=['support','usage','weight_range','distance_range'].filter(key=>!item[key]?.length);
       if(missing.length){unavailable[productId]='missing_'+missing.join('_');continue;}
       technicalCoverage++;
