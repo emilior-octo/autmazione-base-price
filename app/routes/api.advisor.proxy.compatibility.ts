@@ -99,7 +99,7 @@ export async function loader({request}:LoaderFunctionArgs) {
     const scores:Record<string,{percentage:number;reasons:string[]}>={};
     for(const item of ranked.all){
       const productId=String(item.id||"").split("/").pop()||"";
-      if(!wanted.has(productId) || item.bucket!=="primary") continue;
+      if(!wanted.has(productId)) continue;
       // Technical-only percentage: usage 35 + distance 18 + weight 12 = 65.
       // Size is a compatibility gate. Merchant priority and price are excluded.
       if(!item.usage?.length || !item.distance_range?.length || !item.weight_range?.length || !item.support?.length) continue;
@@ -107,7 +107,7 @@ export async function loader({request}:LoaderFunctionArgs) {
       const technical=(Number(b.usage)||0)+(Number(b.distance)||0)+(Number(b.weight)||0);
       scores[productId]={percentage:Math.max(0,Math.min(100,Math.round(technical/65*100))),reasons:Array.isArray(item.labels)?item.labels.filter((x:unknown)=>typeof x==="string").slice(0,2):[]};
     }
-    return Response.json({status:"success",scores,diagnostics:{requested:ids.length,inFinderCatalog:ids.filter(x=>catalogIds.has(x)).length,scored:Object.keys(scores).length}},{headers});
+    return Response.json({status:"success",scores,diagnostics:{requested:ids.length,foundInShopify:ids.filter(x=>catalogIds.has(x)).length,technicallyScored:Object.keys(scores).length,eligibleBySize:ranked.all.length}},{headers});
   }catch(error){
     console.error("[ADVISOR COMPATIBILITY]",error instanceof Error?error.name:"Unknown");
     return Response.json({status:"unavailable",scores:{}},{status:503,headers});
