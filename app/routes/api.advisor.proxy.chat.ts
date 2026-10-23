@@ -30,7 +30,11 @@ export async function action({request}:ActionFunctionArgs) {
   profileStatus=signedCustomerId?"unavailable":"login_required";
   if(signedCustomerId && /^\d{1,20}$/.test(signedCustomerId)){
    try{
-    verifiedCustomerContext=await getAdvisorCustomerContext(signedCustomerId);
+    // A slow Shopify customer lookup must not hold the entire AI conversation indefinitely.
+    verifiedCustomerContext=await Promise.race([
+     getAdvisorCustomerContext(signedCustomerId),
+     new Promise<null>(resolve=>setTimeout(()=>resolve(null),7000))
+    ]);
     const profile=verifiedCustomerContext?.runnerProfile;
     const required=["gender","size","weight","usage","support","distance"];
     profileStatus=profile&&required.every(k=>typeof profile[k]==="string"&&Boolean(profile[k]))?"complete":"incomplete";
