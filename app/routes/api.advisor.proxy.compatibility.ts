@@ -5,7 +5,7 @@ import { getAdvisorCustomerContext } from "../lib/ai-advisor/customer-context.se
 
 
 const require = createRequire(import.meta.url);
-const {scoreTechnicalCompatibility}=require("../lib/ai-advisor/technical-compatibility.cjs");
+const {scoreTechnicalCompatibility}=require(process.cwd()+"/app/lib/ai-advisor/technical-compatibility.cjs");
 const required = ["gender","size","weight","usage","support","distance"] as const;
 const allowed: Record<string,string[]> = {
   gender:["men","women"],usage:["daily","long-distance","speed","race","trail"],
