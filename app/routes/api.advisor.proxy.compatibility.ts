@@ -71,8 +71,10 @@ export async function loader({request}:LoaderFunctionArgs) {
     return Response.json({status:"login_required",scores:{}},{headers});
   const ids=(params.get("ids")||"").split(",").filter(x=>/^\d{1,20}$/.test(x)).slice(0,40);
   if(!ids.length) return Response.json({status:"success",scores:{}},{headers});
+  let stage="admin_session";
   try {
     const {admin}=await unauthenticated.admin(process.env.SHOPIFY_SHOP_DOMAIN!);
+    stage="read_profile";
     const resp=await admin.graphql(`#graphql
       query RunnerCompatibilityProfile($id:ID!){
         customer(id:$id){metafield(namespace:"custom",key:"running_profile"){value}}
@@ -87,12 +89,14 @@ export async function loader({request}:LoaderFunctionArgs) {
     const core=require(process.cwd()+"/app/lib/ai-advisor/shoe-finder-core.cjs").ValsportShoeFinderCore;
     if(!core?.rankProducts) throw new Error("Missing finder engine");
     // Evaluate actual storefront products, not just the two Finder discovery collections.
+    stage="fetch_products";
     const catalog=await getVisibleShoes(admin,ids);
     const answers={
       gender:profile.gender,size:core.normalizeSize(profile.size),
       weight:core.normalizeWeight(profile.weight),usage:core.normalizeUsage(profile.usage),
       support:core.normalizeSupport(profile.support),distance:core.normalizeDistance(profile.distance)
     };
+    stage="rank_products";
     const ranked=core.rankProducts(catalog.map((p:any)=>core.normalizeProduct(p)),answers);
     const wanted=new Set(ids);
     const catalogIds=new Set(catalog.map((p:any)=>String(p.id||"").split("/").pop()));
@@ -109,7 +113,9 @@ export async function loader({request}:LoaderFunctionArgs) {
     }
     return Response.json({status:"success",scores,diagnostics:{requested:ids.length,foundInShopify:ids.filter(x=>catalogIds.has(x)).length,technicallyScored:Object.keys(scores).length,eligibleBySize:ranked.all.length}},{headers});
   }catch(error){
-    console.error("[ADVISOR COMPATIBILITY]",error instanceof Error?error.name:"Unknown");
-    return Response.json({status:"unavailable",scores:{}},{status:503,headers});
+    console.error("[ADVISOR COMPATIBILITY]",{stage,message:error instanceof Error?error.message:"Unknown"});
+    // Shopify App Proxy can substitute a generic HTML 500 for upstream 5xx.
+    // Keep failures structured and non-personal so mobile QA can identify the stage.
+    return Response.json({status:"unavailable",stage,scores:{}},{headers});
   }
 }
