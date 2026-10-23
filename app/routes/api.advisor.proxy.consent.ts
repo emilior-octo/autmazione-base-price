@@ -25,8 +25,10 @@ export async function loader({request}:LoaderFunctionArgs) {
   const state=customer.emailMarketingConsent?.marketingState;
   const decision=customer.metafield?.value;
   // Only prompt where Shopify has no saved choice (including no consent timestamp).
-  const hasChoice=state==="SUBSCRIBED"||state==="UNSUBSCRIBED"||state==="PENDING"||
+  const hasChoice=state==="SUBSCRIBED"||state==="PENDING"||
     Boolean(customer.emailMarketingConsent?.consentUpdatedAt)||decision==="declined"||decision==="accepted";
+  // UNSUBSCRIBED without a decision timestamp is not proof that the customer
+  // explicitly refused: Shopify can use this as the initial default state.
   return Response.json({status:"success",askMarketing:!hasChoice,marketingState:state||"UNKNOWN"},{headers});
  }catch{return Response.json({status:"unavailable"},{status:503,headers})}
 }
