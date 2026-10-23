@@ -34,6 +34,8 @@ function normalizeCollectionGid(raw: string): string {
 
 type Gender = "men" | "women";
 const cache = new Map<Gender, {expires: number; products: unknown[]}>();
+const inFlight = new Map<Gender, Promise<unknown[]>>();
+let cacheGeneration = 0;
 function field(v: {type?: string; value: string} | null) {
  if (!v) return null;
  return v.type?.startsWith("list.") ? JSON.parse(v.value) : v.value;
@@ -42,6 +44,10 @@ export async function getAdvisorCatalog(gender: Gender) {
  if (gender !== "men" && gender !== "women") throw new Error("Invalid gender");
  const cached = cache.get(gender);
  if (cached && cached.expires > Date.now()) return cached.products;
+ const existing = inFlight.get(gender);
+ if (existing) return existing;
+ const generation = cacheGeneration;
+ const load = async (): Promise<unknown[]> => {
  const shop = process.env.SHOPIFY_SHOP_DOMAIN;
  const collectionId = gender === "men" ? process.env.VALSPORT_MEN_COLLECTION_GID : process.env.VALSPORT_WOMEN_COLLECTION_GID;
  if (!shop || !collectionId) throw new Error("Missing Advisor Shopify configuration");
@@ -105,7 +111,12 @@ export async function getAdvisorCatalog(gender: Gender) {
   cursors.add(after);
  }
  console.info("[AI_ADVISOR][STAGE]", {gender, stage:"complete", count:products.length});
- cache.set(gender, {products, expires: Date.now() + 60000});
+ if (generation === cacheGeneration) cache.set(gender, {products, expires: Date.now() + 60000});
  return products;
+ };
+ const promise = load();
+ inFlight.set(gender, promise);
+ try { return await promise; }
+ finally { if (inFlight.get(gender) === promise) inFlight.delete(gender); }
 }
-export function invalidateAdvisorCatalog() { cache.clear(); }
+export function invalidateAdvisorCatalog() { cacheGeneration++; cache.clear(); inFlight.clear(); }
