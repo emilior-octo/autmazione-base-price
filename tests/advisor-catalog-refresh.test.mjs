@@ -29,3 +29,9 @@ test("recommended shoes still require real available sizes",()=>{
  assert.match(source,/finder_usage/);
  assert.match(source,/finder_distance_range/);
 });
+
+test("Shopify profile context lookup cannot block chat indefinitely",()=>{
+ assert.match(chat,/Promise\.race\(\[/);
+ assert.match(chat,/getAdvisorCustomerContext\(signedCustomerId\)/);
+ assert.match(chat,/7000/);
+});
