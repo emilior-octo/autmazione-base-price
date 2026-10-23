@@ -90,7 +90,12 @@ export async function getAdvisorCatalog(gender: Gender) {
     distance_range: field(p.distance), priority: Number(field(p.priority) || 0),
     excluded: field(p.excluded) === "true",
     sizes_available: p.variants.nodes.filter((v: any) => v.availableForSale)
-      .map((v: any) => v.selectedOptions[1]?.value || "")
+      .map((v: any) => {
+        const options = v.selectedOptions || [];
+        const size = options.find((o: any) => /taglia|size|misura|numero|eu size/i.test(o.name || ""));
+        const fallback = options.find((o: any) => /^(?:[2-5][0-9])(?:[.,]5)?(?:\s*(?:EU|EUR))?$/i.test(String(o.value || "").trim()));
+        return String((size || fallback)?.value || "");
+      })
       .map((v: string) => v.replace(/,/g, ".").replace(/\s*EU\b|EUR\b/gi, "").trim()).filter(Boolean)
    });
   }
