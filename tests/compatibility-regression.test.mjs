@@ -5,6 +5,7 @@ import fs from "node:fs";
 const require=createRequire(import.meta.url);
 require("../app/lib/ai-advisor/shoe-finder-core.cjs");
 const core=globalThis.ValsportShoeFinderCore;
+const {scoreTechnicalCompatibility}=require("../app/lib/ai-advisor/technical-compatibility.cjs");
 const source=fs.readFileSync(new URL("../app/routes/api.advisor.proxy.compatibility.ts",import.meta.url),"utf8");
 const fixture={id:"101",handle:"fixture",title:"Fixture",support:["neutral"],usage:["daily"],weight_range:["60-75"],distance_range:["5-10"],sizes_available:["39"],price:14900,priority:0,excluded:false};
 const runner={gender:"women",size:"39",weight:"60-75",usage:"daily",support:"neutral",distance:"5-10"};
@@ -42,10 +43,26 @@ test("compatibility route uses signed Shopify identity and does not trust user p
  assert.match(source,/getVisibleShoes\(admin,ids\)/);
 });
 test("compatibility route excludes price, priority and size from technical formula",()=>{
- assert.match(source,/points\.usage/);
- assert.match(source,/points\.distance/);
- assert.match(source,/points\.weight/);
- assert.match(source,/technical\/65/);
+ assert.match(source,/scoreTechnicalCompatibility\(core,item,answers\)/);
  assert.match(source,/excluded_by_finder/);
  assert.match(source,/missing_/);
+});
+
+test("extracted compatibility keeps exact parity with the previous inline formula and labels",()=>{
+ const examples=[
+  fixture,
+  {...fixture,support:["stability"]},
+  {...fixture,support:["supination"]},
+  {...fixture,usage:["trail"],distance_range:["20-plus"]},
+  {...fixture,price:999999,priority:99,sizes_available:[]},
+  {...fixture,weight_range:["over-90"],usage:["race"]}
+ ];
+ for(const sample of examples){
+  const item=core.normalizeProduct(sample);
+  const old=technical(sample);
+  const result=scoreTechnicalCompatibility(core,item,runner);
+  assert.equal(result.percentage,old,JSON.stringify(sample));
+  const labels=core.buildLabels({...item,size_match:{isExact:false,hasHalfTolerance:false}},runner);
+  assert.deepEqual(result.reasons,labels.filter(x=>typeof x==="string").slice(0,2));
+ }
 });
