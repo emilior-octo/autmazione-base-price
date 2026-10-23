@@ -41,8 +41,8 @@ async function getVisibleShoes(admin:any,ids:string[]){
    const sizes=product.variants?.nodes?.filter((v:any)=>v.availableForSale).map((v:any)=>{
     const opts=v.selectedOptions||[];
     const size=opts.find((o:any)=>/taglia|size|misura|numero/i.test(o.name||""))
-      ||opts.find((o:any)=>/^(?:[2-5][0-9])(?:[.,]5)?(?:\\s*(?:EU|EUR))?$/i.test(String(o.value||"").trim()));
-    return String(size?.value||"").replace(",",".").replace(/\\s*(?:EU|EUR)\\b/gi,"").trim();
+      ||opts.find((o:any)=>/^(?:[2-5][0-9])(?:[.,]5)?(?:\s*(?:EU|EUR))?$/i.test(String(o.value||"").trim()));
+    return String(size?.value||"").replace(",",".").replace(/\s*(?:EU|EUR)\b/gi,"").trim();
    }).filter(Boolean)||[];
    products.push({
     id:String(product.id).split("/").pop(),handle:product.handle,
