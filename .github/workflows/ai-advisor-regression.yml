@@ -17,4 +17,4 @@ jobs:
         with:
           node-version: '22'
       - name: Run isolated regression suite
-        run: node --test tests/ai-advisor-core.test.mjs tests/compatibility-regression.test.mjs
+        run: node --test tests/ai-advisor-core.test.mjs tests/compatibility-regression.test.mjs tests/advisor-catalog-refresh.test.mjs
