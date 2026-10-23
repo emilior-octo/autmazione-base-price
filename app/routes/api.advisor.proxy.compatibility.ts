@@ -1,7 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { createRequire } from "node:module";
 import { authenticate, unauthenticated } from "../shopify.server";
-import { getAdvisorCatalog } from "../lib/ai-advisor/catalog.server";
+
 
 const require = createRequire(import.meta.url);
 const required = ["gender","size","weight","usage","support","distance"] as const;
@@ -11,6 +11,51 @@ const allowed: Record<string,string[]> = {
   weight:["under-60","60-75","76-90","over-90"],distance:["0-5","5-10","10-20","20-plus"]
 };
 const headers={"Cache-Control":"private, no-store"};
+
+const productQuery=`#graphql
+ query CompatibilityProducts($ids:[ID!]!){
+  nodes(ids:$ids){... on Product {
+   id handle
+   support:metafield(namespace:"custom",key:"finder_support"){type value}
+   usage:metafield(namespace:"custom",key:"finder_usage"){type value}
+   weight:metafield(namespace:"custom",key:"finder_weight_range"){type value}
+   distance:metafield(namespace:"custom",key:"finder_distance_range"){type value}
+   excluded:metafield(namespace:"custom",key:"finder_exclude"){value}
+   variants(first:100){pageInfo{hasNextPage}nodes{availableForSale selectedOptions{name value}}}
+  }}
+ }`;
+function metafield(field:any):unknown{
+ if(!field?.value)return null;
+ if(field.type?.startsWith("list.")){try{return JSON.parse(field.value)}catch{return null}}
+ return field.value;
+}
+async function getVisibleShoes(admin:any,ids:string[]){
+ const products:any[]=[];
+ for(let offset=0;offset<ids.length;offset+=10){
+  const batch=ids.slice(offset,offset+10);
+  const response=await admin.graphql(productQuery,{variables:{ids:batch.map(id=>"gid://shopify/Product/"+id)}});
+  const data:any=await response.json();
+  if(data.errors?.length||!Array.isArray(data.data?.nodes))throw Error("PRODUCT_QUERY_FAILED");
+  for(const product of data.data.nodes){
+   if(!product||product.variants?.pageInfo?.hasNextPage)continue;
+   const sizes=product.variants?.nodes?.filter((v:any)=>v.availableForSale).map((v:any)=>{
+    const opts=v.selectedOptions||[];
+    const size=opts.find((o:any)=>/taglia|size|misura|numero/i.test(o.name||""))
+      ||opts.find((o:any)=>/^(?:[2-5][0-9])(?:[.,]5)?(?:\\s*(?:EU|EUR))?$/i.test(String(o.value||"").trim()));
+    return String(size?.value||"").replace(",",".").replace(/\\s*(?:EU|EUR)\\b/gi,"").trim();
+   }).filter(Boolean)||[];
+   products.push({
+    id:String(product.id).split("/").pop(),handle:product.handle,
+    support:metafield(product.support),usage:metafield(product.usage),
+    weight_range:metafield(product.weight),distance_range:metafield(product.distance),
+    excluded:product.excluded?.value==="true",priority:0,price:0,
+    sizes_available:sizes
+   });
+  }
+ }
+ return products;
+}
+
 
 export async function loader({request}:LoaderFunctionArgs) {
   let proxy:Awaited<ReturnType<typeof authenticate.public.appProxy>>;
@@ -41,13 +86,14 @@ export async function loader({request}:LoaderFunctionArgs) {
       return Response.json({status:"profile_incomplete",scores:{}},{headers});
     const core=require(process.cwd()+"/app/lib/ai-advisor/shoe-finder-core.cjs").ValsportShoeFinderCore;
     if(!core?.rankProducts) throw new Error("Missing finder engine");
-    const catalog=await getAdvisorCatalog(profile.gender);
+    // Evaluate actual storefront products, not just the two Finder discovery collections.
+    const catalog=await getVisibleShoes(admin,ids);
     const answers={
       gender:profile.gender,size:core.normalizeSize(profile.size),
       weight:core.normalizeWeight(profile.weight),usage:core.normalizeUsage(profile.usage),
       support:core.normalizeSupport(profile.support),distance:core.normalizeDistance(profile.distance)
     };
-    const ranked=core.rankProducts(catalog.map(core.normalizeProduct),answers);
+    const ranked=core.rankProducts(catalog.map((p:any)=>core.normalizeProduct(p)),answers);
     const wanted=new Set(ids);
     const catalogIds=new Set(catalog.map((p:any)=>String(p.id||"").split("/").pop()));
     const scores:Record<string,{percentage:number;reasons:string[]}>={};
