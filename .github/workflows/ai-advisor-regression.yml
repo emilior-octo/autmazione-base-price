@@ -16,5 +16,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify production SSR external module path
+        run: |
+          node -e "const fs=require('fs');const s=fs.readFileSync('app/routes/api.advisor.proxy.compatibility.ts','utf8');if(!s.includes('process.cwd()+\"/app/lib/ai-advisor/technical-compatibility.cjs\"'))process.exit(1);require(process.cwd()+'/app/lib/ai-advisor/technical-compatibility.cjs');"
       - name: Run isolated regression suite
         run: node --test tests/ai-advisor-core.test.mjs tests/compatibility-regression.test.mjs tests/advisor-catalog-refresh.test.mjs
