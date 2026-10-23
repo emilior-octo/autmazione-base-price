@@ -96,21 +96,32 @@ export async function loader({request}:LoaderFunctionArgs) {
       support:core.normalizeSupport(profile.support),distance:core.normalizeDistance(profile.distance)
     };
     stage="rank_products";
-    const ranked=core.rankProducts(catalog.map((p:any)=>core.normalizeProduct(p)),answers);
+    // Card score measures technical suitability, NOT stock availability.
+    // The Shoe Finder recommender still enforces actual available sizes.
+    const normalized=catalog.map((p:any)=>core.normalizeProduct(p));
     const wanted=new Set(ids);
     const catalogIds=new Set(catalog.map((p:any)=>String(p.id||"").split("/").pop()));
     const scores:Record<string,{percentage:number;reasons:string[]}>={};
-    for(const item of ranked.all){
+    let technicalCoverage=0;
+    let currentlyAvailableSize=0;
+    for(const item of normalized){
       const productId=String(item.id||"").split("/").pop()||"";
-      if(!wanted.has(productId)) continue;
-      // Technical-only percentage: usage 35 + distance 18 + weight 12 = 65.
-      // Size is a compatibility gate. Merchant priority and price are excluded.
-      if(!item.usage?.length || !item.distance_range?.length || !item.weight_range?.length || !item.support?.length) continue;
-      const b=item.bucket_score||{};
-      const technical=(Number(b.usage)||0)+(Number(b.distance)||0)+(Number(b.weight)||0);
-      scores[productId]={percentage:Math.max(0,Math.min(100,Math.round(technical/65*100))),reasons:Array.isArray(item.labels)?item.labels.filter((x:unknown)=>typeof x==="string").slice(0,2):[]};
+      if(!wanted.has(productId)||item.excluded)continue;
+      if(!item.usage?.length||!item.distance_range?.length||!item.weight_range?.length||!item.support?.length)continue;
+      technicalCoverage++;
+      const sizeMatch=core.getSizeCompatibility(item.sizes_available,answers.size);
+      if(sizeMatch.isCompatible)currentlyAvailableSize++;
+      const bucket=core.getSupportBucket(item,answers.support);
+      // Score uses the existing Finder technical dimensions (35+18+12).
+      // Avoid a misleading high percentage for unsupported foot mechanics.
+      const points=core.scoreWithinBucket({...item,size_match:{isExact:false,hasHalfTolerance:false}},answers);
+      const technical=(Number(points.usage)||0)+(Number(points.distance)||0)+(Number(points.weight)||0);
+      const raw=Math.max(0,Math.min(100,Math.round(technical/65*100)));
+      const percentage=bucket==="primary"?raw:bucket==="secondary"?Math.min(raw,70):Math.min(raw,40);
+      const labels=core.buildLabels({...item,size_match:{isExact:false,hasHalfTolerance:false}},answers);
+      scores[productId]={percentage,reasons:Array.isArray(labels)?labels.filter((x:unknown)=>typeof x==="string").slice(0,2):[]};
     }
-    return Response.json({status:"success",scores,diagnostics:{requested:ids.length,foundInShopify:ids.filter(x=>catalogIds.has(x)).length,technicallyScored:Object.keys(scores).length,eligibleBySize:ranked.all.length}},{headers});
+    return Response.json({status:"success",scores,diagnostics:{requested:ids.length,foundInShopify:ids.filter(x=>catalogIds.has(x)).length,technicallyScored:Object.keys(scores).length,technicalCoverage,availableInCustomerSize:currentlyAvailableSize}},{headers});
   }catch(error){
     console.error("[ADVISOR COMPATIBILITY]",{stage,message:error instanceof Error?error.message:"Unknown"});
     // Shopify App Proxy can substitute a generic HTML 500 for upstream 5xx.
