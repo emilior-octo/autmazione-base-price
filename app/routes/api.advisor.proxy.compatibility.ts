@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { createRequire } from "node:module";
 import { authenticate, unauthenticated } from "../shopify.server";
+import { getAdvisorCustomerContext } from "../lib/ai-advisor/customer-context.server";
 
 
 const require = createRequire(import.meta.url);
@@ -75,19 +76,17 @@ export async function loader({request}:LoaderFunctionArgs) {
   try {
     const {admin}=await unauthenticated.admin(process.env.SHOPIFY_SHOP_DOMAIN!);
     stage="read_profile";
-    const resp=await admin.graphql(`#graphql
-      query RunnerCompatibilityProfile($id:ID!){
-        customer(id:$id){metafield(namespace:"custom",key:"running_profile"){value}}
-      }`,{variables:{id:"gid://shopify/Customer/"+id}});
-    const data:any=await resp.json();
-    const raw=data.data?.customer?.metafield?.value;
-    const profile=raw?JSON.parse(raw):null;
+    // Reuse the same verified Shopify customer-context reader as the working chat.
+    const customerContext=await getAdvisorCustomerContext(id);
+    const profile=customerContext?.runnerProfile;
     if(!profile || required.some(k=>typeof profile[k]!=="string"||!profile[k].trim())
       || Object.entries(allowed).some(([k,values])=>!values.includes(profile[k]))
       || !/^(?:[2-5][0-9])(?:\.5)?$/.test(profile.size))
       return Response.json({status:"profile_incomplete",scores:{}},{headers});
-    const core=require(process.cwd()+"/app/lib/ai-advisor/shoe-finder-core.cjs").ValsportShoeFinderCore;
-    if(!core?.rankProducts) throw new Error("Missing finder engine");
+    stage="load_engine";
+    const engineModule=require(process.cwd()+"/app/lib/ai-advisor/shoe-finder-core.cjs");
+    const core=engineModule.ValsportShoeFinderCore ?? (globalThis as any).ValsportShoeFinderCore;
+    if(!core?.rankProducts)throw Error("Missing finder engine");
     // Evaluate actual storefront products, not just the two Finder discovery collections.
     stage="fetch_products";
     const catalog=await getVisibleShoes(admin,ids);
