@@ -4,6 +4,7 @@ export const PRODUCT_FOR_BASE_PRICE_QUERY = `#graphql
       id
       title
       status
+      tags
       basePriceMetafield: metafield(namespace: "pricing", key: "base_price") {
         namespace
         key
