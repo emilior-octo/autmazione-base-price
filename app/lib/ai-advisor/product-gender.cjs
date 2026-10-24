@@ -2,9 +2,8 @@
 const asTags=tags=>Array.isArray(tags)?tags.map(x=>String(x).trim().toLowerCase()):[];
 function genderEligibility(tags,runnerGender){
   const values=new Set(asTags(tags));
-  if(values.has('unisex'))return {eligible:true,reason:null};
-  const men=values.has('uomo')||values.has('men');
-  const women=values.has('donna')||values.has('women');
+  const men=values.has('uomo');
+  const women=values.has('donna');
   if(men&&women)return {eligible:true,reason:null};
   if(!men&&!women)return {eligible:false,reason:'missing_product_gender'};
   return runnerGender==='men'&&men||runnerGender==='women'&&women
