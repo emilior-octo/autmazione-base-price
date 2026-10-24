@@ -69,6 +69,28 @@ export async function syncProductBasePrice({
         ? parseInt(product.discountPercentageMetafield.value)
         : null;
 
+    // Keep the existing discount calculation as the single source of truth.
+    // Tag mutations are idempotent and must run even when metafields are unchanged.
+    const promoTag = "in-promo";
+    const currentTags: string[] = product.tags || [];
+    const hasPromoTag = currentTags.includes(promoTag);
+    const shouldHavePromoTag = discountPercentage > 0;
+    if (shouldHavePromoTag !== hasPromoTag) {
+      const mutation = shouldHavePromoTag ? "tagsAdd" : "tagsRemove";
+      const tagResponse = await admin.graphql(
+        `#graphql mutation SyncPromoTag($id: ID!, $tags: [String!]!) {
+          ${mutation}(id: $id, tags: $tags) {
+            userErrors { field message }
+          }
+        }`,
+        { variables: { id: productId, tags: [promoTag] } },
+      );
+      const tagJson = await tagResponse.json();
+      const tagErrors = tagJson?.data?.[mutation]?.userErrors || [];
+      if (tagErrors.length) console.error("[base-price-sync] PROMO TAG ERROR", tagErrors);
+      else console.log("[base-price-sync] PROMO TAG", { productId, mutation });
+    }
+
     // 🧠 NO-OP WRITE (STOP LOOP)
     const baseUnchanged =
       existingBase !== null &&
