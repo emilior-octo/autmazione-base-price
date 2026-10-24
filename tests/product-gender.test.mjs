@@ -16,9 +16,10 @@ test("men never receive a women-only technical score and vice versa",()=>{
  assert.equal(genderEligibility(["uomo"],"men").eligible,true);
  assert.equal(genderEligibility(["donna"],"women").eligible,true);
 });
-test("unisex and mixed department products remain valid for either runner",()=>{
+test("only matching canonical department tags allow compatibility",()=>{
  for(const gender of ["men","women"]){
-  assert.equal(genderEligibility(["unisex"],gender).eligible,true);
+  assert.equal(genderEligibility(["unisex"],gender).eligible,false);
+  assert.equal(genderEligibility([gender==="men"?"men":"women"],gender).eligible,false);
   assert.equal(genderEligibility(["uomo","donna"],gender).eligible,true);
  }
 });
