@@ -20,6 +20,11 @@ export async function syncProductBasePrice({
 
     const json = await response.json();
 
+    if (json?.errors?.length) {
+      console.error("[base-price-sync] PRODUCT QUERY ERRORS", { productId, errors: json.errors });
+      throw new Error("Product query failed");
+    }
+
     const product = json?.data?.product;
 
     if (!product) return;
@@ -86,9 +91,20 @@ export async function syncProductBasePrice({
         { variables: { id: productId, tags: [promoTag] } },
       );
       const tagJson = await tagResponse.json();
+      const graphqlErrors = tagJson?.errors || [];
       const tagErrors = tagJson?.data?.[mutation]?.userErrors || [];
-      if (tagErrors.length) console.error("[base-price-sync] PROMO TAG ERROR", tagErrors);
-      else console.log("[base-price-sync] PROMO TAG", { productId, mutation });
+      if (!tagResponse.ok || graphqlErrors.length || tagErrors.length || !tagJson?.data?.[mutation]) {
+        console.error("[base-price-sync] PROMO TAG FAILED", {
+          productId,
+          mutation,
+          status: tagResponse.status,
+          graphqlErrors,
+          tagErrors,
+          response: tagJson,
+        });
+        throw new Error("Promo tag mutation failed");
+      }
+      console.log("[base-price-sync] PROMO TAG", { productId, mutation });
     }
 
     // 🧠 NO-OP WRITE (STOP LOOP)
