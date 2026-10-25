@@ -82,14 +82,24 @@ export async function syncProductBasePrice({
     const shouldHavePromoTag = discountPercentage > 0;
     if (shouldHavePromoTag !== hasPromoTag) {
       const mutation = shouldHavePromoTag ? "tagsAdd" : "tagsRemove";
-      const tagResponse = await admin.graphql(
-        `#graphql mutation SyncPromoTag($id: ID!, $tags: [String!]!) {
-          ${mutation}(id: $id, tags: $tags) {
-            userErrors { field message }
-          }
-        }`,
-        { variables: { id: productId, tags: [promoTag] } },
-      );
+      const tagMutation = shouldHavePromoTag
+        ? `#graphql
+            mutation SyncPromoTagAdd($id: ID!, $tags: [String!]!) {
+              tagsAdd(id: $id, tags: $tags) {
+                userErrors { field message }
+              }
+            }
+          `
+        : `#graphql
+            mutation SyncPromoTagRemove($id: ID!, $tags: [String!]!) {
+              tagsRemove(id: $id, tags: $tags) {
+                userErrors { field message }
+              }
+            }
+          `;
+      const tagResponse = await admin.graphql(tagMutation, {
+        variables: { id: productId, tags: [promoTag] },
+      });
       const tagJson = await tagResponse.json();
       const graphqlErrors = tagJson?.errors || [];
       const tagErrors = tagJson?.data?.[mutation]?.userErrors || [];
