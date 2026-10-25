@@ -158,6 +158,13 @@ export async function syncProductBasePrice({
       console.error("metafieldsSet userErrors:", userErrors);
     }
   } catch (error: any) {
+    const graphQLErrors = error?.body?.errors?.graphQLErrors ?? error?.response?.errors?.graphQLErrors ?? error?.errors?.graphQLErrors ?? error?.graphQLErrors;
+    console.error("[base-price-sync] ERROR DETAILS", JSON.stringify({
+      productId,
+      message: error?.message,
+      graphQLErrors,
+      bodyErrors: error?.body?.errors,
+    }, null, 2));
     console.error("[base-price-sync] ERROR", error);
   }
 }
