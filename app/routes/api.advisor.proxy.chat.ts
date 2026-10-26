@@ -3,6 +3,7 @@ import { authenticate, unauthenticated } from "../shopify.server";
 import { sendRunningRecommendationsToKlaviyo } from "../lib/ai-advisor/klaviyo.server";
 import { getAdvisorCatalog } from "../lib/ai-advisor/catalog.server";
 import { searchAdvisorCatalog } from "../lib/ai-advisor/catalog-search.server";
+import { searchCommercialShoes } from "../lib/ai-advisor/commercial-search.server";
 import { getAdvisorCustomerContext } from "../lib/ai-advisor/customer-context.server";
 import { saveVerifiedRunnerProfile } from "../lib/ai-advisor/customer-profile.server";
 import { createRequire } from "node:module";
