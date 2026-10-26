@@ -2,8 +2,8 @@ import { unauthenticated } from "../../shopify.server";
 
 type Filters={brand?:string;size?:string;maxPrice?:number;sort?:"newest"|"deals"|"price";outlet?:boolean};
 const QUERY=`#graphql
-query AdvisorCommercial($query:String!,$after:String,$sort:ProductSortKeys!){
- products(first:50,after:$after,query:$query,sortKey:$sort,reverse:false){
+query AdvisorCommercial($query:String!,$after:String,$sort:ProductSortKeys!,$reverse:Boolean!){
+ products(first:50,after:$after,query:$query,sortKey:$sort,reverse:$reverse){
   pageInfo{hasNextPage endCursor}
   nodes{handle title vendor productType tags createdAt featuredImage{url}
    variants(first:100){pageInfo{hasNextPage} nodes{id availableForSale price compareAtPrice selectedOptions{name value}}}
@@ -21,7 +21,7 @@ export async function searchCommercialShoes(filters:Filters){
  const sort=filters.sort==="newest"?"CREATED_AT":"RELEVANCE";
  const products:any[]=[];let after:string|null=null;
  for(let i=0;i<5;i++){
-  const response=await admin.graphql(QUERY,{variables:{query,after,sort}});
+  const response=await admin.graphql(QUERY,{variables:{query,after,sort,reverse:filters.sort==="newest"}});
   const json:any=await response.json();
   if(json.errors?.length||!json.data?.products)throw Error("Commercial catalog unavailable");
   products.push(...json.data.products.nodes);
