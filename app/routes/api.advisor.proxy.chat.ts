@@ -57,6 +57,20 @@ export async function action({request}:ActionFunctionArgs) {
   const result:any=await response.json();const msg=result?.choices?.[0]?.message;let reply=msg?.content||"";let products:any[]=[];let savedProfileGender:"men"|"women"|null=null;
   const call=msg?.tool_calls?.find((x:any)=>x.function?.name==="find_running_shoes");
   const searchCall=msg?.tool_calls?.filter((x:any)=>x.function?.name==="search_catalog")||[];
+  const commercialCall=msg?.tool_calls?.find((x:any)=>x.function?.name==="search_commercial_shoes");
+  if(commercialCall){
+   try{
+    const args=JSON.parse(commercialCall.function.arguments||"{}");
+    products=await searchCommercialShoes({
+      brand:typeof args.brand==="string"?args.brand.slice(0,40):undefined,
+      size:typeof args.size==="string"?args.size.slice(0,12):undefined,
+      maxPrice:typeof args.maxPrice==="number"&&args.maxPrice>0?args.maxPrice:undefined,
+      sort:["newest","deals","price"].includes(args.sort)?args.sort:undefined,
+      outlet:args.outlet===true
+    });
+    reply=products.length?"Ho trovato queste scarpe disponibili nel catalogo Valsport. Controlla le varianti prima di aggiungere al carrello.":"Non ho trovato scarpe disponibili con tutti questi filtri. Possiamo ampliare la ricerca.";
+   }catch(error){console.warn("[ADVISOR CHAT] Commercial catalog unavailable",error instanceof Error?error.name:"Unknown");reply="Non riesco a verificare il catalogo in questo momento."}
+  }
   if(searchCall.length){try{const batches=await Promise.all(searchCall.slice(0,2).map(async(x:any)=>{const args=JSON.parse(x.function.arguments||"{}");if(!["tops","shorts","accessories"].includes(args.category))throw Error("Invalid category");return searchAdvisorCatalog({category:args.category,gender:["men","women","unisex"].includes(args.gender)?args.gender:undefined,size:typeof args.size==="string"?args.size.slice(0,12):undefined,color:typeof args.color==="string"?args.color.slice(0,50):undefined,features:typeof args.features==="string"?args.features.slice(0,100):undefined})}));products=batches.flat().slice(0,8);reply=products.length?("Ho trovato queste alternative disponibili nel catalogo Valsport. Il colore è una preferenza: se non corrisponde, puoi comunque valutare il modello. "+(products.some((p:any)=>p.sizeFallback)?"Attenzione: alcuni articoli NON sono disponibili nella taglia richiesta; ho indicato le alternative nelle schede. ":"")+"Controlla colore e taglia nel selettore prima di aggiungere al carrello."):"Non ho trovato articoli disponibili nelle categorie cercate, nemmeno ampliando colori e taglie. Posso provare un’altra categoria."}catch(err){console.error("[ADVISOR CHAT] Catalog search",err);reply="Non riesco a verificare il catalogo in questo momento. Riprova tra poco."}}
   if(call){
    try{
