@@ -3,7 +3,7 @@ import { unauthenticated } from "../../shopify.server";
 type Filters={brand?:string;size?:string;maxPrice?:number;sort?:"newest"|"deals"|"price";outlet?:boolean};
 const QUERY=`#graphql
 query AdvisorCommercial($query:String!,$after:String,$sort:ProductSortKeys!){
- products(first:50,after:$after,query:$query,sortKey:$sort,reverse:true){
+ products(first:50,after:$after,query:$query,sortKey:$sort,reverse:false){
   pageInfo{hasNextPage endCursor}
   nodes{handle title vendor productType tags createdAt featuredImage{url}
    variants(first:100){pageInfo{hasNextPage} nodes{id availableForSale price compareAtPrice selectedOptions{name value}}}
