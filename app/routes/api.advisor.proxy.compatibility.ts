@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from "react-router";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { createRequire } from "node:module";
 import { authenticate, unauthenticated } from "../shopify.server";
 import { getAdvisorCustomerContext } from "../lib/ai-advisor/customer-context.server";
@@ -60,7 +60,7 @@ async function getVisibleShoes(admin:any,ids:string[]){
 }
 
 
-export async function loader({request}:LoaderFunctionArgs) {
+async function scoreRequest(request:Request, guestProfile?:Record<string,string>) {
   let proxy:Awaited<ReturnType<typeof authenticate.public.appProxy>>;
   try { proxy=await authenticate.public.appProxy(request); }
   catch { return Response.json({status:"unauthorized",scores:{}},{status:401,headers}); }
@@ -70,17 +70,16 @@ export async function loader({request}:LoaderFunctionArgs) {
   // This value is injected and signed by Shopify App Proxy. No client-supplied
   // identity, email or profile is trusted.
   const id=params.get("logged_in_customer_id");
-  if(!id || !/^\d{1,20}$/.test(id))
+  if(!guestProfile && (!id || !/^\d{1,20}$/.test(id)))
     return Response.json({status:"login_required",scores:{}},{headers});
-  const ids=(params.get("ids")||"").split(",").filter(x=>/^\d{1,20}$/.test(x)).slice(0,40);
+  const ids=(params.get("ids")||"").split(",").filter(x=>/^\d{1,20}$/.test(x)).slice(0,guestProfile?20:40);
   if(!ids.length) return Response.json({status:"success",scores:{}},{headers});
   let stage="admin_session";
   try {
     const {admin}=await unauthenticated.admin(process.env.SHOPIFY_SHOP_DOMAIN!);
     stage="read_profile";
     // Reuse the same verified Shopify customer-context reader as the working chat.
-    const customerContext=await getAdvisorCustomerContext(id);
-    const profile=customerContext?.runnerProfile;
+    const profile=guestProfile || (await getAdvisorCustomerContext(id!))?.runnerProfile;
     if(!profile || required.some(k=>typeof profile[k]!=="string"||!profile[k].trim())
       || Object.entries(allowed).some(([k,values])=>!values.includes(profile[k]))
       || !/^(?:[2-5][0-9])(?:\.5)?$/.test(profile.size))
@@ -128,4 +127,28 @@ export async function loader({request}:LoaderFunctionArgs) {
     // Keep failures structured and non-personal so mobile QA can identify the stage.
     return Response.json({status:"unavailable",stage,scores:{}},{headers});
   }
+}
+
+/** Authenticated Shopify customers still use their saved profile through GET.
+ * Guests may preview technical scores from a validated session-only profile.
+ * This action never writes a guest profile to Shopify or Klaviyo.
+ */
+export async function loader({request}:LoaderFunctionArgs) {
+  return scoreRequest(request);
+}
+export async function action({request}:ActionFunctionArgs) {
+  if(request.method!=="POST")return Response.json({status:"method_not_allowed",scores:{}},{status:405,headers});
+  let data:any;
+  try {
+    if(Number(request.headers.get("content-length")||0)>1500)throw Error("Too large");
+    data=await request.json();
+  }catch{return Response.json({status:"invalid_profile",scores:{}},{status:400,headers})}
+  const source=data?.profile;
+  if(!source||typeof source!=="object"||Array.isArray(source)||
+    Object.entries(allowed).some(([k,values])=>typeof source[k]!=="string"||!values.includes(source[k]))||
+    !/^(?:[2-5][0-9])(?:\\.5)?$/.test(String(source.size)))
+    return Response.json({status:"invalid_profile",scores:{}},{status:400,headers});
+  const profile=Object.fromEntries(required.map(key=>[key,source[key]])) as Record<string,string>;
+  // The score request itself enforces Shopify's signed App Proxy.
+  return scoreRequest(request,profile);
 }
