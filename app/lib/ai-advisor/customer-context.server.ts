@@ -4,7 +4,7 @@ export async function getAdvisorCustomerContext(verifiedCustomerId: string) {
   if (!/^\d{1,20}$/.test(verifiedCustomerId)) return null;
   const shop = process.env.SHOPIFY_SHOP_DOMAIN;
   if (!shop) throw new Error("Shop not configured");
-  let admin;
+  let admin: Awaited<ReturnType<typeof unauthenticated.admin>>["admin"];
   try { ({ admin } = await unauthenticated.admin(shop)); }
   catch (error) { console.warn("[ADVISOR CUSTOMER] Admin session failed", error instanceof Error ? error.message.slice(0,180) : "Unknown"); throw new Error("Admin session unavailable"); }
   const ownerId = "gid://shopify/Customer/" + verifiedCustomerId;
