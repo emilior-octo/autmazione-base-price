@@ -23,7 +23,7 @@ export async function action({request}:ActionFunctionArgs) {
  try {if(Number(request.headers.get("content-length")||0)>2200000)throw Error();data=await request.json()}catch{return Response.json({error:"Invalid request"},{status:400})}
  const messages=Array.isArray(data?.messages)?data.messages.slice(-10):[];
  if(!messages.length||messages.some((m:any)=>!m||!["user","assistant"].includes(m.role)||typeof m.content!=="string"||m.content.length>1000))return Response.json({error:"Invalid messages"},{status:400});
- const photo=typeof data?.photo==="string"&&/^data:image\\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(data.photo)&&data.photo.length<=2100000?data.photo:null;
+ const photo=typeof data?.photo==="string"&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(data.photo)&&data.photo.length<=2100000?data.photo:null;
  if(data?.photo&&!photo)return Response.json({error:"Invalid image"},{status:400});
  const latestUser=[...messages].reverse().find((m:any)=>m.role==="user")?.content||"";
  const priorHandoff=messages.slice(0,-1).some((m:any)=>m.role==="assistant" && /(?:team Valsport|WhatsApp oppure Chatra|contattare il team|operatore|assistenza diretta)/i.test(m.content));
