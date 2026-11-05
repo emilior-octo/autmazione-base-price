@@ -44,7 +44,7 @@ export async function action({request}:ActionFunctionArgs) {
   const core=require(process.cwd()+"/app/lib/ai-advisor/shoe-finder-core.cjs").ValsportShoeFinderCore
    ?? (globalThis as any).ValsportShoeFinderCore;
   if(!core?.rankProducts) throw new Error("Shoe Finder core unavailable");
-  const catalog=await getAdvisorCatalog(input.gender as "men"|"women");
+  const catalog=await getAdvisorCatalog(input.gender as "men"|"women") as Array<{id:string;image:string;handle:string}>;
   const answers={
    gender:input.gender,size:core.normalizeSize(input.size),
    weight:core.normalizeWeight(input.weight),usage:core.normalizeUsage(input.usage),

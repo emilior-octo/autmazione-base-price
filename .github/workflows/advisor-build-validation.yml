@@ -1,0 +1,30 @@
+name: Advisor backend build validation
+
+on:
+  pull_request:
+    paths:
+      - 'app/routes/api.advisor.proxy.*'
+      - 'app/lib/ai-advisor/**'
+      - 'tests/**'
+      - '.github/workflows/advisor-build-validation.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+      - run: npm run typecheck
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+      - run: npm run build
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
