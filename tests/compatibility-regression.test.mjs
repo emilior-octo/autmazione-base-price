@@ -43,10 +43,10 @@ test("compatibility route uses signed Shopify identity and does not trust user p
  assert.match(source,/getVisibleShoes\(admin,ids\)/);
 });
 test("guest scoring uses validated ephemeral profile and does not persist it",()=>{
- assert.match(source,/export async function action\\(\\{request\\}:ActionFunctionArgs\\)/);
- assert.match(source,/scoreRequest\\(request,profile\\)/);
- assert.match(source,/Object\\.entries\\(allowed\\)/);
- assert.match(source,/status:"invalid_profile"/);
+ assert.ok(source.includes("export async function action({request}:ActionFunctionArgs)"));
+ assert.ok(source.includes("scoreRequest(request,profile)"));
+ assert.ok(source.includes("Object.entries(allowed)"));
+ assert.ok(source.includes('status:"invalid_profile"'));
  assert.doesNotMatch(source,/saveVerifiedRunnerProfile|sendRunningRecommendationsToKlaviyo/);
 });
 test("compatibility route excludes price, priority and size from technical formula",()=>{
