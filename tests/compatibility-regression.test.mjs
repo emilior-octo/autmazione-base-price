@@ -39,8 +39,15 @@ test("recommendation engine still requires an available size",()=>{
 test("compatibility route uses signed Shopify identity and does not trust user profile JSON",()=>{
  assert.match(source,/authenticate\.public\.appProxy\(request\)/);
  assert.match(source,/logged_in_customer_id/);
- assert.match(source,/getAdvisorCustomerContext\(id\)/);
+ assert.match(source,/getAdvisorCustomerContext\(id!?\)/);
  assert.match(source,/getVisibleShoes\(admin,ids\)/);
+});
+test("guest scoring uses validated ephemeral profile and does not persist it",()=>{
+ assert.match(source,/export async function action\\(\\{request\\}:ActionFunctionArgs\\)/);
+ assert.match(source,/scoreRequest\\(request,profile\\)/);
+ assert.match(source,/Object\\.entries\\(allowed\\)/);
+ assert.match(source,/status:"invalid_profile"/);
+ assert.doesNotMatch(source,/saveVerifiedRunnerProfile|sendRunningRecommendationsToKlaviyo/);
 });
 test("compatibility route excludes price, priority and size from technical formula",()=>{
  assert.match(source,/scoreTechnicalCompatibility\(core,item,answers\)/);
