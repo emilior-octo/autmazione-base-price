@@ -146,7 +146,7 @@ export async function action({request}:ActionFunctionArgs) {
   const source=data?.profile;
   if(!source||typeof source!=="object"||Array.isArray(source)||
     Object.entries(allowed).some(([k,values])=>typeof source[k]!=="string"||!values.includes(source[k]))||
-    !/^(?:[2-5][0-9])(?:\\.5)?$/.test(String(source.size)))
+    !/^(?:[2-5][0-9])(?:\.5)?$/.test(String(source.size)))
     return Response.json({status:"invalid_profile",scores:{}},{status:400,headers});
   const profile=Object.fromEntries(required.map(key=>[key,source[key]])) as Record<string,string>;
   // The score request itself enforces Shopify's signed App Proxy.
