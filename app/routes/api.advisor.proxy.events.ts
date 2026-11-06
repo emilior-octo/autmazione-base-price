@@ -2,7 +2,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
-const allowed=new Set(["advisor_opened","advisor_message_sent","advisor_products_shown","advisor_product_clicked","product_viewed","product_added_to_cart","checkout_started","checkout_completed"]);
+const allowed=new Set(["advisor_opened","advisor_message_sent","advisor_products_shown","advisor_product_clicked","advisor_add_to_cart","product_viewed","product_added_to_cart","checkout_started","checkout_completed"]);
 const uuid=/^[a-f0-9-]{36}$/i;
 export async function action({request}:ActionFunctionArgs){
  if(request.method!=="POST")return Response.json({ok:false},{status:405});
