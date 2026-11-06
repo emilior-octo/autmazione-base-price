@@ -25,7 +25,7 @@ analytics.subscribe("valsport_advisor",async event=>{
  if(!uuid.test(data.visitorId||""))return;
  visitorId=data.visitorId;
  await browser.localStorage.setItem("valsport_advisor_visitor",JSON.stringify({id:visitorId,expires:Date.now()+86400000}));
- if(["advisor_opened","advisor_message_sent","advisor_products_shown","advisor_product_clicked"].includes(data.action))
+ if(["advisor_opened","advisor_message_sent","advisor_products_shown","advisor_product_clicked","advisor_add_to_cart"].includes(data.action))
   await send(data.action,data,event);
 });
 
