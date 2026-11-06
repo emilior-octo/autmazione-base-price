@@ -86,11 +86,31 @@ export async function action({request}:ActionFunctionArgs) {
   if(call){
    try{
     const args=JSON.parse(call.function.arguments);
-    // Explicit, recent size corrections take precedence over stale saved profile or model arguments.
-    const recentSizeChange=[...messages].reverse().find((m:any)=>m.role==="user"&&/(?:porto|calzo|taglia|numero|size|wear)/i.test(m.content)&&/(?:[2-5][0-9](?:[.,]5)?)/.test(m.content));
-    if(recentSizeChange){
-      const match=recentSizeChange.content.match(/(?:porto|calzo|taglia|numero|size|wear)(?:\\s+(?:il|la|eu|è|e|di|a|now|is))*\\s*([2-5][0-9](?:[.,]5)?)/i);
-      if(match)args.size=match[1].replace(",",".");
+    // Apply explicit first-person updates in chronological order, field by field.
+    // Do not treat hypothetical questions or shopping for another person as profile changes.
+    for(const entry of messages){
+      if(entry.role!=="user")continue;
+      const line=String(entry.content).toLowerCase().replace(/,/g,".");
+      if(/(?:se (?:fossi|pesassi|portassi)|ipotetic|per (?:mio|mia|un amico|una amica|il mio|la mia)|if i were|what if|for my)/i.test(line))continue;
+      const size=line.match(/(?:porto|calzo|la mia taglia (?:è|e)|il mio numero (?:è|e)|my (?:shoe )?size is|i wear (?:a )?size|ora (?:porto|calzo))\\s*(?:il |la |eu |numero |taglia )*([2-5][0-9](?:\\.5)?)/i);
+      if(size)args.size=size[1];
+      const weight=line.match(/(?:peso|ora peso|attualmente peso|i weigh|my weight is|sono (?:sceso|salito|arrivato|arrivata) a)\\s*(?:circa |about )?(\\d{2,3})(?:\\s*(?:kg|chili|chilogrammi))?/i);
+      if(weight){const kg=Number(weight[1]);if(kg>=35&&kg<=250)args.weight=kg<60?"under-60":kg<=75?"60-75":kg<=90?"76-90":"over-90";}
+      if(/(?:appoggio|pronazione|pronation|my gait)/i.test(line)){
+        if(/(?:non (?:lo )?so|non (?:lo )?conosco|non saprei|unknown|not sure)/i.test(line))args.support="unknown";
+        else if(/(?:supin|sottopron)/i.test(line))args.support="supination";
+        else if(/(?:iperpron|pronatore|pronatrice|stabilit|stability)/i.test(line))args.support="stability";
+        else if(/(?:neutr|neutral)/i.test(line))args.support="neutral";
+      }
+      const km=line.match(/(?:corro|faccio|percorro|run|running|distance|distanza)\\s*(?:circa |about |usually |di |per )*(\\d{1,2})(?:\\s*(?:-|a|to)\\s*(\\d{1,2}))?\\s*km/i);
+      if(km){const n=Number(km[2]||km[1]);if(n<=5)args.distance="0-5";else if(n<=10)args.distance="5-10";else if(n<=20)args.distance="10-20";else args.distance="20-plus";}
+      if(/(?:cerco|voglio|preferisco|mi serve|i need|looking for|i want)/i.test(line)){
+        if(/(?:trail|sentier|sterrat)/i.test(line))args.usage="trail";
+        else if(/(?:gara|race|maratona da gara)/i.test(line))args.usage="race";
+        else if(/(?:veloc|ripetut|speed|tempo run)/i.test(line))args.usage="speed";
+        else if(/(?:lungh|long run|long.distance)/i.test(line))args.usage="long-distance";
+        else if(/(?:quotidian|allenament|daily|everyday)/i.test(line))args.usage="daily";
+      }
     }
     const allowed={gender:["men","women"],usage:["daily","long-distance","speed","race","trail"],support:["neutral","stability","supination","unknown"],weight:["under-60","60-75","76-90","over-90"],distance:["0-5","5-10","10-20","20-plus"]} as Record<string,string[]>;
     if(Object.entries(allowed).some(([key,values])=>!values.includes(args[key]))||! /^(?:[2-5][0-9])(?:\.5)?$/.test(String(args.size)))throw Error("Invalid profile");
