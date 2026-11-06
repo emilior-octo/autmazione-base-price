@@ -28,7 +28,7 @@ export async function action({request}:ActionFunctionArgs) {
  if(data?.photo&&!photo)return Response.json({error:"Invalid image"},{status:400});
  const replyWithLog=async(body:any,options?:ResponseInit)=>{
   if(typeof body?.reply==="string"&&typeof data?.visitorId==="string"){
-   try{await logAdvisorExchange({shop,visitorId:data.visitorId,userText:[...messages].reverse().find((m:any)=>m.role==="user")?.content||"",assistantText:body.reply});}
+   try{await logAdvisorExchange({shop,visitorId:data.visitorId,userText:[...messages].reverse().find((m:any)=>m.role==="user")?.content||"",assistantText:body.reply,customerId:(()=>{const id=new URL(request.url).searchParams.get("logged_in_customer_id");return id&&/^\d{1,20}$/.test(id)?id:null})()});}
    catch(error){console.warn("[ADVISOR CHAT] Conversation log unavailable",error instanceof Error?error.name:"Unknown");}
   }
   return Response.json(body,options);
