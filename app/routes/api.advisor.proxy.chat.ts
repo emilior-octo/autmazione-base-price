@@ -49,15 +49,15 @@ export async function action({request}:ActionFunctionArgs) {
  // Explicit product requests take priority over the technical questionnaire.
  // Do not silently reuse Shoe Finder constraints to hide a model requested by name.
  const knownBrands=["Brooks","Asics","Hoka","Saucony","Nike","Adidas","New Balance","Mizuno","On","Puma"];
- const mentionedBrand=knownBrands.find(b=>new RegExp("\\b"+b.replace(/ /g,"\\s+")+"\\b","i").test(latestUser));
+ const mentionedBrand=knownBrands.find(b=>new RegExp("\b"+b.replace(/ /g,"\s+")+"\b","i").test(latestUser));
  const latestBrandRequest=Boolean(mentionedBrand&&/(?:ultim[aoie]|novit[aà]|pi[uù] recent|newest|latest|nuov[aoie])/i.test(latestUser)&&/(?:scarpe|modelli|running|brooks|asics|hoka|saucony|nike|adidas|mizuno|puma)/i.test(latestUser));
- const modelRequest=latestUser.match(/\\b(ghost|glycerin|adrenaline|launch|hyperion|cumulus|nimbus|kayano|novablast|clifton|bondi|mach|ride|triumph|endorphin|pegasus|vomero|invincible|wave rider|wave sky)\\s*(\\d{1,2})?\\b/i);
+ const modelRequest=latestUser.match(/\b(ghost|glycerin|adrenaline|launch|hyperion|cumulus|nimbus|kayano|novablast|clifton|bondi|mach|ride|triumph|endorphin|pegasus|vomero|invincible|wave rider|wave sky)\s*(\d{1,2})?\b/i);
  const explicitModel=Boolean(modelRequest&&/(?:vedere|ved|mostr|cerc|trova|fammi|vorrei|voglio|hai|disponib|show|find|look|cerco|prezzo)/i.test(latestUser));
  if(!photo&&(latestBrandRequest||explicitModel)){
   try{
    const model=modelRequest&&!latestBrandRequest?[modelRequest[1],modelRequest[2]].filter(Boolean).join(" "):undefined;
    const previousUser=messages.filter((m:any)=>m.role==="user").slice(-8).map((m:any)=>m.content).join(" ");
-   const size=previousUser.match(/(?:taglia|numero|porto|calzo)\\s*(?:eu |è |e |di |il |la )*([2-5][0-9](?:[.,]5)?)/i)?.[1]?.replace(",",".");
+   const size=previousUser.match(/(?:taglia|numero|porto|calzo)\s*(?:eu |è |e |di |il |la )*([2-5][0-9](?:[.,]5)?)/i)?.[1]?.replace(",",".");
    const products=await searchNamedRunningShoes({brand:mentionedBrand,model,latest:latestBrandRequest,size});
    const intro=latestBrandRequest?"Ecco i modelli più recenti di "+mentionedBrand+" che trovo disponibili nel catalogo.": "Ecco "+model+" nel catalogo Valsport.";
    const note=" La disponibilità non equivale alla compatibilità tecnica: se vuoi, confrontiamo il modello con il tuo profilo running prima di scegliere.";
