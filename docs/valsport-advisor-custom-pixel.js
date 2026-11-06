@@ -33,6 +33,10 @@ analytics.subscribe("product_added_to_cart",async event=>{
  if(!visitorId){try{const saved=JSON.parse(await browser.localStorage.getItem("valsport_advisor_visitor")||"null");if(saved?.expires>Date.now())visitorId=saved.id;}catch(_){}}
  await send("product_added_to_cart",{productId:event.data?.cartLine?.merchandise?.product?.id},event);
 });
+analytics.subscribe("checkout_started",async event=>{
+ if(!visitorId){try{const saved=JSON.parse(await browser.localStorage.getItem("valsport_advisor_visitor")||"null");if(saved?.expires>Date.now())visitorId=saved.id;}catch(_){}}
+ await send("checkout_started",{},event);
+});
 analytics.subscribe("checkout_completed",async event=>{
  if(!visitorId){try{const saved=JSON.parse(await browser.localStorage.getItem("valsport_advisor_visitor")||"null");if(saved?.expires>Date.now())visitorId=saved.id;}catch(_){}}
  await send("checkout_completed",{orderId:event.data?.checkout?.order?.id},event);
