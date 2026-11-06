@@ -1,3 +1,4 @@
+import { summarizeTechnicalMatch } from "../lib/ai-advisor/named-shoe-match.server";
 import { searchNamedRunningShoes } from "../lib/ai-advisor/named-shoe-search.server";
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate, unauthenticated } from "../shopify.server";
@@ -60,7 +61,23 @@ export async function action({request}:ActionFunctionArgs) {
    const size=previousUser.match(/(?:taglia|numero|porto|calzo)\s*(?:eu |è |e |di |il |la )*([2-5][0-9](?:[.,]5)?)/i)?.[1]?.replace(",",".");
    const products=await searchNamedRunningShoes({brand:mentionedBrand,model,latest:latestBrandRequest,size});
    const intro=latestBrandRequest?"Ecco i modelli più recenti di "+mentionedBrand+" che trovo disponibili nel catalogo.": "Ecco "+model+" nel catalogo Valsport.";
-   const note=" La disponibilità non equivale alla compatibilità tecnica: se vuoi, confrontiamo il modello con il tuo profilo running prima di scegliere.";
+   let note=" La disponibilità non equivale alla compatibilità tecnica: se vuoi, confrontiamo il modello con il tuo profilo running prima di scegliere.";
+   const runner=verifiedCustomerContext?.runnerProfile;
+   if(products.length&&runner&&profileStatus==="complete"){
+    try{
+     const core=require(process.cwd()+"/app/lib/ai-advisor/shoe-finder-core.cjs").ValsportShoeFinderCore;
+     const catalog=await getAdvisorCatalog(runner.gender);
+     const item=catalog.map(core.normalizeProduct).find((p:any)=>p.handle===products[0].handle);
+     if(item&&!item.excluded){
+      const sizeMatch=core.getSizeCompatibility(item.sizes_available,runner.size);
+      if(sizeMatch.isCompatible){
+       const product={...item,size_match:sizeMatch};
+       const answers={support:core.normalizeSupport(runner.support),size:core.normalizeSize(runner.size),weight:core.normalizeWeight(runner.weight),usage:core.normalizeUsage(runner.usage),distance:core.normalizeDistance(runner.distance)};
+       note=" "+summarizeTechnicalMatch({bucket:core.getSupportBucket(product,answers.support),score:core.scoreWithinBucket(product,answers).total,labels:core.buildLabels(product,answers)});
+      }else note=" La taglia del profilo non risulta compatibile con quelle registrate nel catalogo tecnico.";
+     }else note=" Il modello non dispone ancora dei dati necessari per un punteggio tecnico affidabile.";
+    }catch(error){console.warn("[ADVISOR CHAT] Matching unavailable",error instanceof Error?error.name:"Unknown");}
+   }
    return replyWithLog({reply:products.length?intro+note:"Non trovo questo modello disponibile nel catalogo al momento. Posso cercare alternative simili.",products},{headers:{"Cache-Control":"no-store"}});
   }catch(error){console.warn("[ADVISOR CHAT] Named model search unavailable",error instanceof Error?error.name:"Unknown");}
  }
