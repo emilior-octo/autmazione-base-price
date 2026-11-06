@@ -63,3 +63,20 @@ model AdvisorFeedback {
   createdAt DateTime @default(now())
   conversation AdvisorConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
+
+model AdvisorAnalyticsEvent {
+  id String @id @default(cuid())
+  shop String
+  eventId String
+  visitorId String
+  eventType String
+  productId String?
+  variantId String?
+  orderId String?
+  value Decimal? @db.Decimal(12, 2)
+  currency String?
+  createdAt DateTime @default(now())
+  @@unique([shop, eventId])
+  @@index([shop, visitorId, createdAt])
+  @@index([shop, eventType, createdAt])
+}
