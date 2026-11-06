@@ -82,7 +82,7 @@ export default function AdvisorConsole(){
     <h2 style={{margin:"0 0 6px",fontSize:18}}>Analytics Advisor · ultimi 30 giorni</h2>
     <p style={{fontSize:12,color:"#64748b",margin:"0 0 12px"}}>Eventi osservati, non vendite verificate.</p>
     <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-     {([["Chat aperte","advisor_opened"],["Prodotti mostrati","advisor_products_shown"],["Click prodotto","advisor_product_clicked"],["Add to cart Advisor","advisor_add_to_cart"],["Checkout avviati","checkout_started"],["Acquisti segnalati","checkout_completed"]] as const).map(([label,key])=><div key={key} style={{flex:"1 1 135px",background:"#f8fafc",padding:12,borderRadius:10}}><div style={{fontSize:12,color:"#64748b"}}>{label}</div><div style={{fontSize:23,fontWeight:750}}>{analytics[key]||0}</div></div>)}
+     {([["Chat aperte","advisor_opened"],["Prodotti mostrati","advisor_products_shown"],["Click prodotto","advisor_product_clicked"],["Add to cart Advisor","advisor_add_to_cart"],["Checkout cliccati","advisor_checkout_intent"],["Checkout avviati (pixel)","checkout_started"],["Acquisti segnalati","checkout_completed"]] as const).map(([label,key])=><div key={key} style={{flex:"1 1 135px",background:"#f8fafc",padding:12,borderRadius:10}}><div style={{fontSize:12,color:"#64748b"}}>{label}</div><div style={{fontSize:23,fontWeight:750}}>{analytics[key]||0}</div></div>)}
     </div>
    </div>
    <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}>
