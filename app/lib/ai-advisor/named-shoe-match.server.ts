@@ -37,7 +37,7 @@ export function extractGuestRunnerProfile(messages: Array<{role:string;content:s
   if(size)profile.size=size[1];
   const weight=line.match(/(?:peso|weight|i weigh)\s*(?:circa |about )?(\d{2,3})\s*(?:kg|chili|chilogrammi)?/i);
   if(weight){const kg=Number(weight[1]);if(kg>=35&&kg<=250)profile.weight=kg<60?"under-60":kg<=75?"60-75":kg<=90?"76-90":"over-90";}
-  if(/\b(?:sono supinatore|sono supinatrice|appoggio supinatore|appoggio supinazione|supinazione|supinatore)\b/i.test(line))profile.support="supination";
+  if(/\b(?:sono supinatore|sono supinatrice|io sono supinatore|io sono supinatrice|appoggio supinatore|appoggio supinazione|supinazione|supinatore)\b/i.test(line))profile.support="supination";
   else if(/\b(?:sono pronatore|sono pronatrice|iperpronazione|appoggio pronatore)\b/i.test(line))profile.support="stability";
   else if(/\b(?:appoggio neutro|sono neutro|sono neutra)\b/i.test(line))profile.support="neutral";
   else if(/\b(?:appoggio non noto|non conosco l.appoggio|non so l.appoggio)\b/i.test(line))profile.support="unknown";
