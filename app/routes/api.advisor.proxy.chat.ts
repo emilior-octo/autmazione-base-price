@@ -1,4 +1,4 @@
-import { summarizeTechnicalMatch } from "../lib/ai-advisor/named-shoe-match.server";
+import { extractGuestRunnerProfile, summarizeTechnicalMatch } from "../lib/ai-advisor/named-shoe-match.server";
 import { searchNamedRunningShoes } from "../lib/ai-advisor/named-shoe-search.server";
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate, unauthenticated } from "../shopify.server";
@@ -62,8 +62,11 @@ export async function action({request}:ActionFunctionArgs) {
    const products=await searchNamedRunningShoes({brand:mentionedBrand,model,latest:latestBrandRequest,size});
    const intro=latestBrandRequest?"Ecco i modelli più recenti di "+mentionedBrand+" che trovo disponibili nel catalogo.": "Ecco "+model+" nel catalogo Valsport.";
    let note=" La disponibilità non equivale alla compatibilità tecnica: se vuoi, confrontiamo il modello con il tuo profilo running prima di scegliere.";
-   const runner=verifiedCustomerContext?.runnerProfile;
-   if(products.length&&runner&&profileStatus==="complete"){
+   const guest=extractGuestRunnerProfile(messages);
+   const saved=profileStatus==="complete"?verifiedCustomerContext?.runnerProfile:null;
+   const runner={...(saved||{}),...guest};
+   const profileReady=["gender","size","weight","usage","support","distance"].every(k=>typeof (runner as any)[k]==="string"&&Boolean((runner as any)[k]));
+   if(products.length&&profileReady){
     try{
      const core=require(process.cwd()+"/app/lib/ai-advisor/shoe-finder-core.cjs").ValsportShoeFinderCore;
      const catalog=await getAdvisorCatalog(runner.gender);
@@ -77,6 +80,10 @@ export async function action({request}:ActionFunctionArgs) {
       }else note=" La taglia del profilo non risulta compatibile con quelle registrate nel catalogo tecnico.";
      }else note=" Il modello non dispone ancora dei dati necessari per un punteggio tecnico affidabile.";
     }catch(error){console.warn("[ADVISOR CHAT] Matching unavailable",error instanceof Error?error.name:"Unknown");}
+   }
+   if(products.length&&!profileReady){
+    const missing=["gender","size","weight","usage","support","distance"].filter(k=>!(runner as any)[k]);
+    note=" Posso mostrarti il modello, ma per il punteggio tecnico mi mancano "+missing.length+" informazioni sul tuo profilo. Non invento una compatibilità.";
    }
    return replyWithLog({reply:products.length?intro+note:"Non trovo questo modello disponibile nel catalogo al momento. Posso cercare alternative simili.",products},{headers:{"Cache-Control":"no-store"}});
   }catch(error){console.warn("[ADVISOR CHAT] Named model search unavailable",error instanceof Error?error.name:"Unknown");}
