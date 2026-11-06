@@ -43,7 +43,8 @@ export async function loader({request}:LoaderFunctionArgs){
  const since=new Date(Date.now()-30*86400000);
  const eventGroups=await prisma.advisorAnalyticsEvent.groupBy({by:["eventType"],where:{shop:session.shop,createdAt:{gte:since}},_count:{_all:true}});
  const analytics=Object.fromEntries(eventGroups.map(g=>[g.eventType,g._count._all]));
- return {conversations,detail,total,page,search,shop:session.shop,notesOnly,feedbackCount,latestFeedback,customerDirectory,analytics};
+ const detailEvents=detail?await prisma.advisorAnalyticsEvent.findMany({where:{shop:session.shop,visitorId:detail.visitorId},orderBy:{createdAt:"asc"},take:100,select:{id:true,eventType:true,createdAt:true,productId:true,orderId:true}}):[];
+ return {conversations,detail,total,page,search,shop:session.shop,notesOnly,feedbackCount,latestFeedback,customerDirectory,analytics,detailEvents};
 }
 
 export async function action({request}:ActionFunctionArgs){
@@ -60,7 +61,7 @@ export async function action({request}:ActionFunctionArgs){
 }
 
 export default function AdvisorConsole(){
- const {conversations,detail,total,page,search,shop,notesOnly,feedbackCount,latestFeedback,customerDirectory,analytics}=useLoaderData<typeof loader>();
+ const {conversations,detail,total,page,search,shop,notesOnly,feedbackCount,latestFeedback,customerDirectory,analytics,detailEvents}=useLoaderData<typeof loader>();
  const feedback=useFetcher<typeof action>();
  const [params,setParams]=useSearchParams();
  const [expanded,setExpanded]=React.useState(false);
