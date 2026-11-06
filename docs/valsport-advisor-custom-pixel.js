@@ -34,6 +34,6 @@ analytics.subscribe("product_added_to_cart",async event=>{
  await send("product_added_to_cart",{},event);
 });
 analytics.subscribe("checkout_completed",async event=>{
- if(!visitorId)visitorId=await browser.localStorage.getItem("valsport_advisor_visitor");
+ if(!visitorId){try{const saved=JSON.parse(await browser.localStorage.getItem("valsport_advisor_visitor")||"null");if(saved?.expires>Date.now())visitorId=saved.id;}catch(_){}}
  await send("checkout_completed",{},event);
 });
