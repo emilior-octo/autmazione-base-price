@@ -22,6 +22,7 @@ export async function getAdvisorCustomerContext(verifiedCustomerId: string) {
       return null;
     }
   }
+  const identityCustomer = await queryCustomer("firstName lastName");
   const profileCustomer = await queryCustomer('metafield(namespace: "custom", key: "running_profile") { value }');
   const ordersCustomer = await queryCustomer('orders(first: 5, sortKey: CREATED_AT, reverse: true) { nodes { createdAt lineItems(first: 10) { nodes { title variantTitle quantity } } } }');
   if (!profileCustomer && !ordersCustomer) throw new Error("Customer data unavailable");
@@ -36,6 +37,7 @@ export async function getAdvisorCustomerContext(verifiedCustomerId: string) {
     }
   } catch {}
   return {
+    firstName: typeof identityCustomer?.firstName==="string" ? identityCustomer.firstName.slice(0,60) : null,
     runnerProfile: profile,
     recentOrders: (ordersCustomer?.orders?.nodes || []).map((order: any) => ({
       date: String(order.createdAt || "").slice(0, 10),
