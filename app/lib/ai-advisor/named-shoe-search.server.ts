@@ -15,9 +15,11 @@ export async function searchNamedRunningShoes(input:{brand?:string;model?:string
  const {admin}=await unauthenticated.admin(shop);
  const brand=(input.brand||"").replace(/[^a-zA-Z0-9 -]/g,"").trim().slice(0,35);
  const model=(input.model||"").replace(/[^a-zA-Z0-9 .-]/g,"").trim().slice(0,60);
- const terms=[brand,model].filter(Boolean);
- if(!terms.length)return [];
- const search=terms.map(term=>"title:"+term.split(/\s+/).filter(Boolean).map(w=>w+"*").join(" AND title:")).join(" AND ");
+ if(!brand&&!model)return [];
+ const search=[
+  ...(brand?["vendor:"+JSON.stringify(brand)]:[]),
+  ...(model?model.split(/\s+/).filter(Boolean).map(w=>"title:"+w+"*"):[])
+ ].join(" AND ");
  const response=await admin.graphql(query,{variables:{search,sort:input.latest?"CREATED_AT":"RELEVANCE",reverse:Boolean(input.latest)}});
  const data:any=await response.json();
  if(data.errors?.length)throw Error("Shopify product search unavailable");
