@@ -6,6 +6,7 @@ import { searchAdvisorCatalog } from "../lib/ai-advisor/catalog-search.server";
 import { searchCommercialShoes } from "../lib/ai-advisor/commercial-search.server";
 import { getAdvisorCustomerContext } from "../lib/ai-advisor/customer-context.server";
 import { saveVerifiedRunnerProfile } from "../lib/ai-advisor/customer-profile.server";
+import { logAdvisorExchange } from "../lib/ai-advisor/conversation-log.server";
 import { createRequire } from "node:module";
 import { needsHumanPostSale } from "../lib/ai-advisor/post-sale-handoff.server";
 const require=createRequire(import.meta.url);
@@ -25,17 +26,24 @@ export async function action({request}:ActionFunctionArgs) {
  if(!messages.length||messages.some((m:any)=>!m||!["user","assistant"].includes(m.role)||typeof m.content!=="string"||m.content.length>1000))return Response.json({error:"Invalid messages"},{status:400});
  const photo=typeof data?.photo==="string"&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(data.photo)&&data.photo.length<=2100000?data.photo:null;
  if(data?.photo&&!photo)return Response.json({error:"Invalid image"},{status:400});
+ const replyWithLog=async(body:any,options?:ResponseInit)=>{
+  if(typeof body?.reply==="string"&&typeof data?.visitorId==="string"){
+   try{await logAdvisorExchange({shop,visitorId:data.visitorId,userText:[...messages].reverse().find((m:any)=>m.role==="user")?.content||"",assistantText:body.reply});}
+   catch(error){console.warn("[ADVISOR CHAT] Conversation log unavailable",error instanceof Error?error.name:"Unknown");}
+  }
+  return Response.json(body,options);
+ };
  const latestUser=[...messages].reverse().find((m:any)=>m.role==="user")?.content||"";
  const photoMention=/(?:foto|fotograf|immagin|photo|picture|image|pic\\b)/i.test(latestUser);
  const photoOffer=/(?:mand|invi|caric|alleg|mostr|ved|guard|posso|puoi|come|send|upload|attach|show|look|check)/i.test(latestUser);
  const asksPhoto=photoMention&&(photoOffer||/(?:scarpe|suol|shoes|sole|usur|consumat)/i.test(latestUser));
- if(asksPhoto&&!data?.photo)return Response.json({reply:"Sì, mandami pure una foto delle suole usando la fotocamera qui sotto! Posso aiutarti a osservare l'usura e capire se ci sono segnali che suggeriscono di controllare o sostituire le scarpe, anche se una foto da sola non basta per stabilirlo con certezza.",products:[]},{headers:{"Cache-Control":"no-store"}});
+ if(asksPhoto&&!data?.photo)return replyWithLog({reply:"Sì, mandami pure una foto delle suole usando la fotocamera qui sotto! Posso aiutarti a osservare l'usura e capire se ci sono segnali che suggeriscono di controllare o sostituire le scarpe, anche se una foto da sola non basta per stabilirlo con certezza.",products:[]},{headers:{"Cache-Control":"no-store"}});
  const asksToUnderstandSupport=/(?:appoggi|pronazion|supinazion|gait|foot strike)/i.test(messages.slice(-5).map((m:any)=>m.content).join(" "))&&/(?:bo+|non (?:lo )?(?:so|capisco)|fammi capire|spiegami|aiutami|non ne ho idea|help me understand|i don't know)/i.test(latestUser);
- if(asksToUnderstandSupport&&!photo)return Response.json({reply:"Ti aiuto volentieri a capirlo! Se hai scarpe da corsa già usate, dimmi dove noti più consumo sulla suola oppure carica una foto con la fotocamera qui sotto. L'usura è solo un indizio, non una diagnosi. Se preferisci, possiamo valutare anche modelli neutri senza dare per scontato che siano adatti a te, oppure puoi confrontarti con uno specialista del nostro team tramite WhatsApp o Chatra.",products:[]},{headers:{"Cache-Control":"no-store"}});
+ if(asksToUnderstandSupport&&!photo)return replyWithLog({reply:"Ti aiuto volentieri a capirlo! Se hai scarpe da corsa già usate, dimmi dove noti più consumo sulla suola oppure carica una foto con la fotocamera qui sotto. L'usura è solo un indizio, non una diagnosi. Se preferisci, possiamo valutare anche modelli neutri senza dare per scontato che siano adatti a te, oppure puoi confrontarti con uno specialista del nostro team tramite WhatsApp o Chatra.",products:[]},{headers:{"Cache-Control":"no-store"}});
  const priorHandoff=messages.slice(0,-1).some((m:any)=>m.role==="assistant" && /(?:team Valsport|WhatsApp oppure Chatra|contattare il team|operatore|assistenza diretta)/i.test(m.content));
  const handoffFollowup=priorHandoff && /^(?:s[iì]|ok|va bene|mandami|dammi|voglio|aprimi|apri|link|whatsapp|chatra|contatt(?:a|are)|parlare)(?:\b|$)/i.test(latestUser.trim());
  if(needsHumanPostSale(latestUser)||handoffFollowup){
-  return Response.json({reply:"Per ordini, spedizioni, tracking, resi e rimborsi ti metto in contatto con il team Valsport, così riceverai informazioni precise. Usa i pulsanti WhatsApp o Chatra che trovi qui sotto: aprono direttamente il contatto corretto.",products:[],handoff:"human"},{headers:{"Cache-Control":"no-store"}});
+  return replyWithLog({reply:"Per ordini, spedizioni, tracking, resi e rimborsi ti metto in contatto con il team Valsport, così riceverai informazioni precise. Usa i pulsanti WhatsApp o Chatra che trovi qui sotto: aprono direttamente il contatto corretto.",products:[],handoff:"human"},{headers:{"Cache-Control":"no-store"}});
  }
  const rawLocale=data?.locale||{};
  const marketLanguage=typeof rawLocale.language==="string"&&/^[a-z]{2,3}(?:-[a-z]{2,4})?$/i.test(rawLocale.language)?rawLocale.language:"it";
@@ -70,7 +78,7 @@ export async function action({request}:ActionFunctionArgs) {
   const searchCall=photo?[]:msg?.tool_calls?.filter((x:any)=>x.function?.name==="search_catalog")||[];
   const commercialCall=photo?undefined:msg?.tool_calls?.find((x:any)=>x.function?.name==="search_commercial_shoes");
   const asksAboutSupport=/\\b(?:come|how|capisc|riconosc|understand|know|determin|figure out)\\b/i.test(latestUser)&&/\\b(?:appoggi|piede|pronazion|supinazion|support|foot|gait|it)\\b/i.test(latestUser);
-  if(asksAboutSupport && call){return Response.json({reply:"Puoi osservare come si consumano le tue vecchie scarpe, ma l’usura da sola non basta per stabilire il tipo di appoggio. Una valutazione della corsa fatta da un professionista può aiutarti a capirlo meglio. Se non lo conosci, nessun problema: possiamo indicarlo come «non noto» e continuare la ricerca senza inventare nulla.",products:[],profileStatus},{headers:{"Cache-Control":"no-store"}})}
+  if(asksAboutSupport && call){return replyWithLog({reply:"Puoi osservare come si consumano le tue vecchie scarpe, ma l’usura da sola non basta per stabilire il tipo di appoggio. Una valutazione della corsa fatta da un professionista può aiutarti a capirlo meglio. Se non lo conosci, nessun problema: possiamo indicarlo come «non noto» e continuare la ricerca senza inventare nulla.",products:[],profileStatus},{headers:{"Cache-Control":"no-store"}})}
   if(commercialCall){
    try{
     const args=JSON.parse(commercialCall.function.arguments||"{}");
@@ -166,6 +174,6 @@ export async function action({request}:ActionFunctionArgs) {
    reply=reply.replace(/\\[\\[SOLE_WEAR:[^\\]]*\\]\\]/g,"").trim();
   }
   if(typeof reply!=="string"||!reply.trim())throw Error("Empty reply");
-  return Response.json({reply:reply.slice(0,3000),wearZones,products,profileStatus,savedProfileGender,guestRunnerProfile:savedProfileGender?null:guestRunnerProfile},{headers:{"Cache-Control":"no-store"}});
+  return replyWithLog({reply:reply.slice(0,3000),wearZones,products,profileStatus,savedProfileGender,guestRunnerProfile:savedProfileGender?null:guestRunnerProfile},{headers:{"Cache-Control":"no-store"}});
  }catch(e){console.error("[ADVISOR CHAT]",e instanceof Error?e.message:"Unknown");return Response.json({error:"AI temporarily unavailable"},{status:503})}
 }
