@@ -143,6 +143,11 @@ export default function AdvisorConsole(){
         <div style={{fontSize:11,fontWeight:700,color:"#475569",marginBottom:6}}>{m.role==="user"?"CLIENTE":"RUNNING ADVISOR"} · {format(m.createdAt)}</div><div style={{fontSize:14,lineHeight:1.5}}>{m.content}</div>
        </div>)}
       </div>
+      {detailEvents.filter(e=>e.eventType==="product_added_to_cart"||e.eventType==="checkout_completed").length>0&&<div style={{padding:14,marginBottom:16,border:"1px solid #fdba74",borderRadius:12,background:"#fff7ed"}}>
+       <strong>Eventi commerciali dopo l'interazione</strong>
+       {detailEvents.filter(e=>e.eventType==="product_added_to_cart"||e.eventType==="checkout_completed").map(e=><div key={e.id} style={{fontSize:13,marginTop:8}}>{e.eventType==="checkout_completed"?"🟢 Acquisto segnalato":"🛒 Aggiunta al carrello"} · {format(e.createdAt)} {e.productId?"· Prodotto "+e.productId:""}</div>)}
+       <div style={{fontSize:11,color:"#9a3412",marginTop:8}}>Eventi pixel osservati, non ordini verificati.</div>
+      </div>}
       <div style={{borderTop:"1px solid #e3e7ec",paddingTop:18}}>
        <h3 style={{marginTop:0}}>Feedback dello staff</h3>
        <feedback.Form method="post">
