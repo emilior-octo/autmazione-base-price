@@ -13,7 +13,7 @@ async function send(type,data,source){
  const href=source?.context?.document?.location?.href||init?.context?.document?.location?.href;
  if(!href)return;
  const origin=new URL(href).origin;
- const event={eventId:newId(),visitorId,type,
+ const event={eventId:uuid.test(data?.eventId||"")?data.eventId:newId(),visitorId,type,
   productId:data?.productId?String(data.productId).slice(0,80):undefined,
   variantId:data?.variantId?String(data.variantId).slice(0,80):undefined,
   orderId:data?.orderId?String(data.orderId).slice(0,80):undefined,
