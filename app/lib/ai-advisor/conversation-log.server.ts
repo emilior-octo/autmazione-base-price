@@ -2,13 +2,13 @@ import prisma from "../../db.server";
 
 type Message = {role:"user"|"assistant";content:string};
 export async function logAdvisorExchange(input:{
- shop:string; visitorId:string; userText:string; assistantText:string;
+ shop:string; visitorId:string; userText:string; assistantText:string; customerId?:string|null;
 }):Promise<void>{
  if(!/^[a-f0-9-]{36}$/i.test(input.visitorId))return;
  const conversation=await prisma.advisorConversation.upsert({
   where:{shop_visitorId:{shop:input.shop,visitorId:input.visitorId}},
-  create:{shop:input.shop,visitorId:input.visitorId},
-  update:{}
+  create:{shop:input.shop,visitorId:input.visitorId,customerId:input.customerId||null},
+  update:input.customerId?{customerId:input.customerId}:{}
  });
  await prisma.advisorMessage.createMany({data:[
   {conversationId:conversation.id,role:"user",content:input.userText.slice(0,1000)},
