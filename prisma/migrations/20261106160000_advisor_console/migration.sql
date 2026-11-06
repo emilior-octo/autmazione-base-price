@@ -1,0 +1,8 @@
+CREATE TABLE "AdvisorConversation" ("id" TEXT NOT NULL,"shop" TEXT NOT NULL,"visitorId" TEXT NOT NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CONSTRAINT "AdvisorConversation_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "AdvisorConversation_shop_visitorId_key" ON "AdvisorConversation"("shop","visitorId");
+CREATE TABLE "AdvisorMessage" ("id" TEXT NOT NULL,"conversationId" TEXT NOT NULL,"role" TEXT NOT NULL,"content" TEXT NOT NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "AdvisorMessage_pkey" PRIMARY KEY ("id"));
+CREATE INDEX "AdvisorMessage_conversationId_createdAt_idx" ON "AdvisorMessage"("conversationId","createdAt");
+ALTER TABLE "AdvisorMessage" ADD CONSTRAINT "AdvisorMessage_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "AdvisorConversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE TABLE "AdvisorFeedback" ("id" TEXT NOT NULL,"conversationId" TEXT NOT NULL,"staffId" TEXT NOT NULL,"rating" TEXT NOT NULL,"note" TEXT NOT NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,CONSTRAINT "AdvisorFeedback_pkey" PRIMARY KEY ("id"));
+CREATE INDEX "AdvisorFeedback_conversationId_createdAt_idx" ON "AdvisorFeedback"("conversationId","createdAt");
+ALTER TABLE "AdvisorFeedback" ADD CONSTRAINT "AdvisorFeedback_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "AdvisorConversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
