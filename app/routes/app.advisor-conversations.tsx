@@ -43,7 +43,7 @@ export async function loader({request}:LoaderFunctionArgs){
  const since=new Date(Date.now()-30*86400000);
  const eventGroups=await prisma.advisorAnalyticsEvent.groupBy({by:["eventType"],where:{shop:session.shop,createdAt:{gte:since}},_count:{_all:true}});
  const analytics=Object.fromEntries(eventGroups.map(g=>[g.eventType,g._count._all]));
- const detailEvents=detail?await prisma.advisorAnalyticsEvent.findMany({where:{shop:session.shop,visitorId:detail.visitorId},orderBy:{createdAt:"asc"},take:100,select:{id:true,eventType:true,createdAt:true,productId:true,orderId:true}}):[];
+ const detailEvents=detail?await prisma.advisorAnalyticsEvent.findMany({where:{shop:session.shop,visitorId:detail.visitorId,createdAt:{gte:detail.createdAt}},orderBy:{createdAt:"asc"},take:100,select:{id:true,eventType:true,createdAt:true,productId:true,orderId:true}}):[];
  return {conversations,detail,total,page,search,shop:session.shop,notesOnly,feedbackCount,latestFeedback,customerDirectory,analytics,detailEvents};
 }
 
