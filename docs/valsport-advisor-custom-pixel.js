@@ -28,3 +28,12 @@ analytics.subscribe("valsport_advisor",async event=>{
  if(["advisor_opened","advisor_message_sent","advisor_products_shown","advisor_product_clicked"].includes(data.action))
   await send(data.action,data,event);
 });
+
+analytics.subscribe("product_added_to_cart",async event=>{
+ if(!visitorId)visitorId=await browser.localStorage.getItem("valsport_advisor_visitor");
+ await send("product_added_to_cart",{},event);
+});
+analytics.subscribe("checkout_completed",async event=>{
+ if(!visitorId)visitorId=await browser.localStorage.getItem("valsport_advisor_visitor");
+ await send("checkout_completed",{},event);
+});
