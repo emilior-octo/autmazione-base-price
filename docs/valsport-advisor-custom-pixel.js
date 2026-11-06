@@ -24,13 +24,13 @@ analytics.subscribe("valsport_advisor",async event=>{
  const data=event.customData||{};
  if(!uuid.test(data.visitorId||""))return;
  visitorId=data.visitorId;
- await browser.localStorage.setItem("valsport_advisor_visitor",visitorId);
+ await browser.localStorage.setItem("valsport_advisor_visitor",JSON.stringify({id:visitorId,expires:Date.now()+86400000}));
  if(["advisor_opened","advisor_message_sent","advisor_products_shown","advisor_product_clicked"].includes(data.action))
   await send(data.action,data,event);
 });
 
 analytics.subscribe("product_added_to_cart",async event=>{
- if(!visitorId)visitorId=await browser.localStorage.getItem("valsport_advisor_visitor");
+ if(!visitorId){try{const saved=JSON.parse(await browser.localStorage.getItem("valsport_advisor_visitor")||"null");if(saved?.expires>Date.now())visitorId=saved.id;}catch(_){}}
  await send("product_added_to_cart",{},event);
 });
 analytics.subscribe("checkout_completed",async event=>{
