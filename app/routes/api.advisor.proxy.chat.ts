@@ -49,7 +49,7 @@ export async function action({request}:ActionFunctionArgs) {
  // Explicit product requests take priority over the technical questionnaire.
  // Do not silently reuse Shoe Finder constraints to hide a model requested by name.
  const knownBrands=["Brooks","Asics","Hoka","Saucony","Nike","Adidas","New Balance","Mizuno","On","Puma"];
- const mentionedBrand=knownBrands.find(b=>new RegExp("\b"+b.replace(/ /g,"\s+")+"\b","i").test(latestUser));
+ const mentionedBrand=knownBrands.find(b=>new RegExp("\\b"+b.replace(/ /g,"\\s+")+"\\b","i").test(latestUser));
  const latestBrandRequest=Boolean(mentionedBrand&&/(?:ultim[aoie]|novit[aà]|pi[uù] recent|newest|latest|nuov[aoie])/i.test(latestUser)&&/(?:scarpe|modelli|running|brooks|asics|hoka|saucony|nike|adidas|mizuno|puma)/i.test(latestUser));
  const modelRequest=latestUser.match(/\b(ghost|glycerin|adrenaline|launch|hyperion|cumulus|nimbus|kayano|novablast|clifton|bondi|mach|ride|triumph|endorphin|pegasus|vomero|invincible|wave rider|wave sky)\s*(\d{1,2})?\b/i);
  const explicitModel=Boolean(modelRequest&&/(?:vedere|ved|mostr|cerc|trova|fammi|vorrei|voglio|hai|disponib|show|find|look|cerco|prezzo)/i.test(latestUser));
