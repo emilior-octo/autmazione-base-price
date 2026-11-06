@@ -77,6 +77,13 @@ export default function AdvisorConsole(){
  const ratingLabel=(r:string)=>r==="useful"?"Risposta utile":r==="incorrect"?"Risposta errata":"Da migliorare";
  return <s-page heading="Running Advisor · Console">
   <s-section>
+   <div style={{...box,padding:16,marginBottom:18}}>
+    <h2 style={{margin:"0 0 6px",fontSize:18}}>Analytics Advisor · ultimi 30 giorni</h2>
+    <p style={{fontSize:12,color:"#64748b",margin:"0 0 12px"}}>Eventi osservati, non vendite verificate.</p>
+    <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+     {([["Chat aperte","advisor_opened"],["Prodotti mostrati","advisor_products_shown"],["Click prodotto","advisor_product_clicked"],["Aggiunte al carrello","product_added_to_cart"],["Checkout avviati","checkout_started"],["Acquisti segnalati","checkout_completed"]] as const).map(([label,key])=><div key={key} style={{flex:"1 1 135px",background:"#f8fafc",padding:12,borderRadius:10}}><div style={{fontSize:12,color:"#64748b"}}>{label}</div><div style={{fontSize:23,fontWeight:750}}>{analytics[key]||0}</div></div>)}
+    </div>
+   </div>
    <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:18}}>
     {[["Conversazioni",total],["Ultime 5",Math.min(total,5)],["Feedback registrati",feedbackCount]].map(([label,value])=><div key={String(label)} style={{...box,padding:"14px 20px",minWidth:150,flex:"1 1 140px"}}><div style={{fontSize:12,color:"#6b7280"}}>{label}</div><div style={{fontSize:27,fontWeight:750}}>{value}</div></div>)}
    </div>
