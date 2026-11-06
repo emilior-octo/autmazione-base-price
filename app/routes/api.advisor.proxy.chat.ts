@@ -168,7 +168,7 @@ export async function action({request}:ActionFunctionArgs) {
   }
   let wearZones:string[]=[];
   if(photo&&typeof reply==="string"){
-   const found=reply.match(/\\[\\[SOLE_WEAR:([a-z_,]+)\\]\\]/);
+   const found=reply.match(/\[\[SOLE_WEAR:([a-z_,]+)\]\]/);
    const allowed=new Set(["heel_inner","heel_outer","midfoot_inner","midfoot_outer","forefoot_inner","forefoot_outer","toe"]);
    if(found)wearZones=found[1].split(",").filter((z:string)=>allowed.has(z)).slice(0,3);
    reply=reply.replace(/\\[\\[SOLE_WEAR:[^\\]]*\\]\\]/g,"").trim();
