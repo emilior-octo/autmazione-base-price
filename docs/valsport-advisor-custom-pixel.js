@@ -10,7 +10,7 @@ const newId=()=>"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
 });
 async function send(type,data,source){
  if(!uuid.test(visitorId||""))return;
- const href=source?.context?.document?.location?.href||init?.context?.document?.location?.href;
+ const href=source?.context?.document?.location?.href || (typeof init!=="undefined"?init?.context?.document?.location?.href:null);
  if(!href)return;
  const origin=new URL(href).origin;
  const event={eventId:uuid.test(data?.eventId||"")?data.eventId:newId(),visitorId,type,
@@ -18,7 +18,7 @@ async function send(type,data,source){
   variantId:data?.variantId?String(data.variantId).slice(0,80):undefined,
   orderId:data?.orderId?String(data.orderId).slice(0,80):undefined,
   value:data?.value,currency:data?.currency};
- try{await fetch(origin+endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(event),keepalive:true})}catch(_){}
+ try{const response=await fetch(origin+endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(event),keepalive:true});if(!response.ok)console.warn("[Valsport Advisor Pixel] HTTP",response.status,type);}catch(error){console.warn("[Valsport Advisor Pixel] Invio fallito",type,String(error));}
 }
 analytics.subscribe("valsport_advisor",async event=>{
  const data=event.customData||{};
