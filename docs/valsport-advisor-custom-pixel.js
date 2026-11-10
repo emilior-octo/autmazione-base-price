@@ -8,17 +8,32 @@ const uuid=/^[a-f0-9-]{36}$/i;
 const newId=()=>"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
  const n=Math.floor(Math.random()*16);return(c==="x"?n:(n&3|8)).toString(16);
 });
+async function resolveVisitor(event){
+ const attrs=event?.data?.checkout?.attributes||[];
+ const cartId=attrs.find(a=>a?.key==="_valsport_advisor_visitor")?.value;
+ if(uuid.test(cartId||""))visitorId=cartId;
+ if(!uuid.test(visitorId||"")){
+  try{const saved=JSON.parse(await browser.localStorage.getItem("valsport_advisor_visitor")||"null");
+   if(saved?.expires>Date.now()&&uuid.test(saved.id||""))visitorId=saved.id;
+  }catch(_){}
+ }
+ if(!uuid.test(visitorId||""))console.warn("[Valsport Advisor Pixel] visitorId missing",event?.name);
+ return uuid.test(visitorId||"");
+}
 async function send(type,data,source){
- if(!uuid.test(visitorId||""))return;
+ if(!(await resolveVisitor(source)))return;
  const href=source?.context?.document?.location?.href || (typeof init!=="undefined"?init?.context?.document?.location?.href:null);
- if(!href)return;
+ if(!href){console.warn("[Valsport Advisor Pixel] origin missing",type);return;}
  const origin=new URL(href).origin;
  const event={eventId:uuid.test(data?.eventId||"")?data.eventId:newId(),visitorId,type,
   productId:data?.productId?String(data.productId).slice(0,80):undefined,
   variantId:data?.variantId?String(data.variantId).slice(0,80):undefined,
   orderId:data?.orderId?String(data.orderId).slice(0,80):undefined,
   value:data?.value,currency:data?.currency};
- try{const response=await fetch(origin+endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(event),keepalive:true});if(!response.ok)console.warn("[Valsport Advisor Pixel] HTTP",response.status,type);}catch(error){console.warn("[Valsport Advisor Pixel] Invio fallito",type,String(error));}
+ try{const response=await fetch(origin+endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(event),keepalive:true});
+  if(!response.ok)console.warn("[Valsport Advisor Pixel] HTTP",response.status,type);
+  else console.info("[Valsport Advisor Pixel] delivered",type,await response.text());
+ }catch(error){console.warn("[Valsport Advisor Pixel] send failed",type,String(error));}
 }
 analytics.subscribe("valsport_advisor",async event=>{
  const data=event.customData||{};
@@ -35,9 +50,9 @@ analytics.subscribe("product_added_to_cart",async event=>{
 });
 analytics.subscribe("checkout_started",async event=>{
  if(!visitorId){try{const saved=JSON.parse(await browser.localStorage.getItem("valsport_advisor_visitor")||"null");if(saved?.expires>Date.now())visitorId=saved.id;}catch(_){}}
- await send("checkout_started",{},event);
+ await send("checkout_started",{value:event.data?.checkout?.totalPrice?.amount,currency:event.data?.checkout?.currencyCode},event);
 });
 analytics.subscribe("checkout_completed",async event=>{
  if(!visitorId){try{const saved=JSON.parse(await browser.localStorage.getItem("valsport_advisor_visitor")||"null");if(saved?.expires>Date.now())visitorId=saved.id;}catch(_){}}
- await send("checkout_completed",{orderId:event.data?.checkout?.order?.id},event);
+ await send("checkout_completed",{orderId:event.data?.checkout?.order?.id,value:event.data?.checkout?.totalPrice?.amount,currency:event.data?.checkout?.currencyCode},event);
 });
