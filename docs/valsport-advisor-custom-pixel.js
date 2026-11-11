@@ -10,7 +10,7 @@ const newId=()=>"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
 });
 async function resolveVisitor(event){
  const attrs=event?.data?.checkout?.attributes||[];
- const cartId=attrs.find(a=>a?.key==="_valsport_advisor_visitor")?.value;
+ const cartId=attrs.find(a=>a?.key==="_valsport_advisor_visitor"||a?.key==="valsport_advisor_visitor")?.value;
  if(uuid.test(cartId||""))visitorId=cartId;
  if(!uuid.test(visitorId||"")){
   try{const saved=JSON.parse(await browser.localStorage.getItem("valsport_advisor_visitor")||"null");
@@ -22,7 +22,7 @@ async function resolveVisitor(event){
 }
 async function send(type,data,source){
  if(!(await resolveVisitor(source)))return;
- const event={eventId:uuid.test(data?.eventId||"")?data.eventId:newId(),visitorId,type,
+ const event={eventId:uuid.test(data?.eventId||"")?data.eventId:uuid.test(source?.id||"")?source.id:newId(),visitorId,type,
   productId:data?.productId?String(data.productId).slice(0,80):undefined,
   variantId:data?.variantId?String(data.variantId).slice(0,80):undefined,
   orderId:data?.orderId?String(data.orderId).slice(0,80):undefined,
@@ -37,13 +37,13 @@ analytics.subscribe("valsport_advisor",async event=>{
  if(!uuid.test(data.visitorId||""))return;
  visitorId=data.visitorId;
  await browser.localStorage.setItem("valsport_advisor_visitor",JSON.stringify({id:visitorId,expires:Date.now()+86400000}));
- if(["advisor_opened","advisor_message_sent","advisor_products_shown","advisor_product_clicked","advisor_add_to_cart"].includes(data.action))
-  await send(data.action,data,event);
+ // Storefront already sends Advisor events through the authenticated app proxy.
+ // Do not duplicate them from this pixel.
 });
 
 analytics.subscribe("product_added_to_cart",async event=>{
  if(!visitorId){try{const saved=JSON.parse(await browser.localStorage.getItem("valsport_advisor_visitor")||"null");if(saved?.expires>Date.now())visitorId=saved.id;}catch(_){}}
- await send("product_added_to_cart",{productId:event.data?.cartLine?.merchandise?.product?.id},event);
+ // Cart additions are not checkout events; do not use them as conversions.
 });
 analytics.subscribe("checkout_started",async event=>{
  if(!visitorId){try{const saved=JSON.parse(await browser.localStorage.getItem("valsport_advisor_visitor")||"null");if(saved?.expires>Date.now())visitorId=saved.id;}catch(_){}}
