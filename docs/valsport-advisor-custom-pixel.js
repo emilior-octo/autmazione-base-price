@@ -1,7 +1,7 @@
 // Shopify Custom Pixel — Valsport Running
 // Configure under Settings > Customer events.
 // Requires storefront to publish "valsport_advisor" with visitorId.
-const endpoint="/apps/running-advisor/events";
+const endpoint="https://valsportrunning.com/apps/running-advisor/events";
 let visitorId=null;
 
 const uuid=/^[a-f0-9-]{36}$/i;
@@ -17,20 +17,17 @@ async function resolveVisitor(event){
    if(saved?.expires>Date.now()&&uuid.test(saved.id||""))visitorId=saved.id;
   }catch(_){}
  }
- if(!uuid.test(visitorId||""))console.warn("[Valsport Advisor Pixel] visitorId missing",event?.name);
+ if(!uuid.test(visitorId||""))console.warn("[Valsport Advisor Pixel] visitorId missing",event?.name,"checkout attributes",attrs.map(a=>a?.key));
  return uuid.test(visitorId||"");
 }
 async function send(type,data,source){
  if(!(await resolveVisitor(source)))return;
- const href=source?.context?.document?.location?.href || (typeof init!=="undefined"?init?.context?.document?.location?.href:null);
- if(!href){console.warn("[Valsport Advisor Pixel] origin missing",type);return;}
- const origin=new URL(href).origin;
  const event={eventId:uuid.test(data?.eventId||"")?data.eventId:newId(),visitorId,type,
   productId:data?.productId?String(data.productId).slice(0,80):undefined,
   variantId:data?.variantId?String(data.variantId).slice(0,80):undefined,
   orderId:data?.orderId?String(data.orderId).slice(0,80):undefined,
   value:data?.value,currency:data?.currency};
- try{const response=await fetch(origin+endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(event),keepalive:true});
+ try{const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(event),keepalive:true});
   if(!response.ok)console.warn("[Valsport Advisor Pixel] HTTP",response.status,type);
   else console.info("[Valsport Advisor Pixel] delivered",type,await response.text());
  }catch(error){console.warn("[Valsport Advisor Pixel] send failed",type,String(error));}
